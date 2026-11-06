@@ -1,0 +1,1567 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MCheck Handoff Prototype</title>
+<meta name="description" content="Working prototype of MCheck® Handoff, a case management workbench MVP: clock-driven queue, I-PASS member handoff, call-and-confirm documentation. All patient data is fictional.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --navy:#072669;--blue:#2A6AF1;--blue-ink:#1F57D6;--tint:#EAF0FE;--ink:#141B26;--muted:#5A6884;--faint:#8D97AA;
+  --rule:#DDE2EA;--panel:#F4F6FA;--surface:#FFFFFF;--canvas:#F4F6FA;--head:#072669;--side:#072669;
+  --red:#B8322B;--redt:#FBECEA;--redfill:#B8322B;--green:#0D7553;--greent:#E2F3EC;--amber:#8F5B00;--ambert:#FDF3DE;
+  --plum:#7A3B97;--plumt:#F4ECF8;--grey:#5A6884;--greyt:#EEF0F4;--bar:#2A6AF1;--scrim:rgba(7,18,46,.55);
+  --pop:0 12px 32px rgba(7,38,105,.16),0 2px 6px rgba(7,38,105,.08);--blk-other:#C9CFDA;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --navy:#3D63C9;--blue:#6B95FF;--blue-ink:#8FB0FF;--tint:#1A2A4D;--ink:#E7ECF5;--muted:#A3AFC4;--faint:#6F7B92;
+    --rule:#2A3449;--panel:#1B2333;--surface:#151C2A;--canvas:#0D1220;--head:#B5C9FF;--side:#0A1433;
+    --red:#F07A70;--redt:#3A1F22;--green:#5CCB9E;--greent:#123329;--amber:#E9B654;--ambert:#352A12;
+    --plum:#CFA2E6;--plumt:#2E2140;--grey:#A3AFC4;--greyt:#232C3D;--bar:#6B95FF;--scrim:rgba(0,0,0,.6);
+    --pop:0 12px 32px rgba(0,0,0,.5);--blk-other:#3A4458;
+  }
+}
+:root[data-theme="dark"]{
+    --navy:#3D63C9;--blue:#6B95FF;--blue-ink:#8FB0FF;--tint:#1A2A4D;--ink:#E7ECF5;--muted:#A3AFC4;--faint:#6F7B92;
+    --rule:#2A3449;--panel:#1B2333;--surface:#151C2A;--canvas:#0D1220;--head:#B5C9FF;--side:#0A1433;
+    --red:#F07A70;--redt:#3A1F22;--green:#5CCB9E;--greent:#123329;--amber:#E9B654;--ambert:#352A12;
+    --plum:#CFA2E6;--plumt:#2E2140;--grey:#A3AFC4;--greyt:#232C3D;--bar:#6B95FF;--scrim:rgba(0,0,0,.6);
+    --pop:0 12px 32px rgba(0,0,0,.5);--blk-other:#3A4458;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--canvas);color:var(--ink);font:15px/1.45 var(--sans);font-feature-settings:"tnum" 1;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;cursor:pointer}
+input,select,textarea{font:inherit;color:inherit}
+a{color:var(--blue-ink)}
+.mono{font-family:var(--mono);font-feature-settings:normal}
+.muted{color:var(--muted)}
+.faint{color:var(--faint)}
+.small{font-size:13px}
+.xs{font-size:12px}
+h1,h2,h3{margin:0;color:var(--head);font-weight:600;letter-spacing:-.005em}
+h1{font-size:26px;line-height:1.2}
+h2{font-size:18px;line-height:1.3}
+h3{font-size:15px}
+:focus-visible{outline:2px solid var(--blue);outline-offset:2px;border-radius:4px}
+
+/* ---------- shell ---------- */
+.app{display:grid;grid-template-columns:72px minmax(0,1fr);min-height:100vh}
+.side{background:var(--side);position:sticky;top:0;height:100vh;display:flex;flex-direction:column;align-items:center;padding:12px 0;gap:4px;z-index:30}
+.logo{width:42px;height:42px;border-radius:10px;background:#fff;color:#072669;display:grid;place-items:center;font:700 15px var(--sans);margin-bottom:14px;letter-spacing:-.02em}
+.nav{width:72px;height:52px;display:grid;place-items:center;border:0;background:none;color:#B9C7EA;position:relative}
+.nav:hover{color:#fff;background:rgba(255,255,255,.06)}
+.nav[aria-current="true"]{color:#fff}
+.nav[aria-current="true"]::before{content:"";position:absolute;left:0;top:8px;bottom:8px;width:3px;background:#fff;border-radius:0 3px 3px 0}
+.nav .tip{position:absolute;left:66px;background:#0B1638;color:#fff;font-size:12px;white-space:nowrap;padding:5px 9px;border-radius:6px;opacity:0;pointer-events:none;transform:translateX(-4px);transition:.12s}
+.nav:hover .tip,.nav:focus-visible .tip{opacity:1;transform:none}
+.nav .badge{position:absolute;top:9px;right:16px;background:#B8322B;color:#fff;font:600 10px var(--mono);border-radius:8px;padding:1px 5px}
+.side .spacer{flex:1}
+
+.top{position:sticky;top:0;z-index:25;height:62px;background:var(--surface);border-bottom:1px solid var(--rule);display:flex;align-items:center;gap:14px;padding:0 24px}
+.brand{display:flex;align-items:baseline;gap:10px;min-width:0}
+.brand b{color:var(--head);font-size:18px;font-weight:600;white-space:nowrap}
+.brand b sup{font-size:9px}
+.brand span{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.clockbox{margin:0 auto;display:flex;align-items:center;gap:8px}
+.simclock{font:500 16px var(--mono);color:var(--ink);white-space:nowrap}
+.simclock .sec{color:var(--faint)}
+.dshort{display:none}
+.jump{display:flex;gap:2px;background:var(--panel);border:1px solid var(--rule);border-radius:8px;padding:2px}
+.jump button{border:0;background:none;padding:4px 8px;border-radius:6px;font:500 12px var(--mono);color:var(--muted)}
+.jump button:hover{color:var(--ink);background:var(--surface)}
+.jump button[aria-pressed="true"]{background:var(--surface);color:var(--blue-ink);box-shadow:0 0 0 1px var(--rule)}
+.iconbtn{border:1px solid var(--rule);background:var(--surface);height:34px;min-width:34px;border-radius:8px;display:inline-grid;place-items:center;color:var(--muted);padding:0 8px}
+.iconbtn:hover{color:var(--ink);border-color:var(--faint)}
+.who{display:flex;align-items:center;gap:10px;color:var(--muted);white-space:nowrap}
+.avatar{width:34px;height:34px;border-radius:50%;background:var(--tint);color:var(--blue-ink);display:grid;place-items:center;font-weight:600;font-size:13px}
+.main{padding:22px 28px 140px;max-width:1560px;margin:0 auto;width:100%}
+
+/* ---------- buttons ---------- */
+.btn{display:inline-flex;align-items:center;gap:8px;height:38px;padding:0 16px;border-radius:8px;border:1px solid var(--rule);background:var(--surface);font-weight:500;white-space:nowrap}
+.btn:hover{border-color:var(--faint)}
+.btn.primary{background:#2A6AF1;border-color:#2A6AF1;color:#fff}
+.btn.primary:hover{filter:brightness(1.06)}
+.btn.primary[disabled]{opacity:.45;cursor:not-allowed;filter:none}
+.btn.sm{height:30px;padding:0 11px;font-size:13px}
+.btn.ghost{border-color:transparent;background:none;color:var(--blue-ink)}
+.btn.ghost:hover{background:var(--tint)}
+.link{border:0;background:none;color:var(--blue-ink);padding:0;font-weight:500}
+.link:hover{text-decoration:underline}
+
+/* ---------- chips & tags ---------- */
+.chip{display:inline-flex;align-items:center;gap:6px;min-height:26px;padding:3px 10px;border-radius:13px;font-size:13px;font-weight:500;line-height:1.3;background:var(--greyt);color:var(--grey);vertical-align:middle;text-align:left}
+.chip svg{flex:none}
+.chip.ok{background:var(--greent);color:var(--green)}
+.chip.confirm{background:var(--ambert);color:var(--amber)}
+.chip.conflict{background:var(--plumt);color:var(--plum)}
+.chip.expected{background:var(--tint);color:var(--blue-ink)}
+.chip.unknown{background:var(--greyt);color:var(--grey)}
+.chip.line{background:var(--surface);border:1px solid var(--rule);color:var(--ink)}
+.chip.line svg{color:var(--green)}
+.chip.line.c svg{color:var(--amber)}
+.chip.line.p svg{color:var(--plum)}
+.chip.line.e svg{color:var(--blue-ink)}
+.chip.judg{background:var(--tint);color:var(--blue-ink)}
+.chip.star{background:none;border:1px solid var(--head);color:var(--head);border-radius:6px;min-height:22px;padding:1px 8px;font-size:12px}
+.chip.tiny{min-height:20px;padding:1px 8px;font-size:12px}
+.chip[data-prov]{cursor:help}
+button.chip{border:0}
+button.chip:hover{filter:brightness(.97)}
+.tag{display:inline-flex;align-items:center;gap:6px;background:var(--redfill);color:#fff;border-radius:5px;padding:3px 9px;font-size:13px;font-weight:600;white-space:nowrap;vertical-align:middle}
+.tag.soft{background:var(--redt);color:var(--red)}
+.pin{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--navy);color:#fff;font:600 12px var(--mono);flex:none}
+.pin.o{background:var(--surface);color:var(--head);border:1.5px solid var(--head)}
+.kbd{font:500 11px var(--mono);border:1px solid var(--rule);border-bottom-width:2px;border-radius:4px;padding:1px 5px;color:var(--muted);background:var(--surface)}
+
+/* ---------- cards ---------- */
+.card{background:var(--surface);border:1px solid var(--rule);border-radius:12px}
+.card-h{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:16px 20px 10px}
+.card-h p{margin:2px 0 0;color:var(--muted);font-size:13px}
+.card-h .chip,.wb .chip{white-space:nowrap}
+.ba .t,.ba .h{white-space:nowrap;padding:2px 6px}
+.card-b{padding:6px 20px 18px}
+.grid-main{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:20px;align-items:start}
+.stack{display:grid;gap:18px;grid-template-columns:minmax(0,1fr)}
+.stack > *{min-width:0}
+.g2{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.mrow span:first-child{min-width:0}
+.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.between{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.hr{height:1px;background:var(--rule);margin:12px 0}
+.eyebrow{font:600 12px var(--sans);letter-spacing:.08em;text-transform:uppercase}
+.page-h{display:flex;justify-content:space-between;gap:20px;align-items:flex-end;margin-bottom:18px;flex-wrap:wrap}
+.page-h p{margin:6px 0 0;color:var(--muted);max-width:760px}
+.legend{display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:flex-end;max-width:620px}
+.legend .lbl{color:var(--muted);font-size:13px;margin:0 2px 0 8px}
+
+/* ---------- queue ---------- */
+.now{border-left:4px solid var(--redfill);background:linear-gradient(0deg,var(--surface),var(--surface));position:relative}
+.now .wash{background:var(--redt);opacity:.35;position:absolute;inset:0;border-radius:12px;pointer-events:none}
+.now > *{position:relative}
+.now-top{display:flex;justify-content:space-between;gap:16px;padding:18px 22px 6px;flex-wrap:wrap}
+.timer{font:600 30px var(--mono);color:var(--red);line-height:1}
+.numtable{width:100%;border-collapse:collapse;font-size:14px;background:var(--surface);border:1px solid var(--rule);border-radius:8px;overflow:hidden}
+.numtable th{font-weight:500;color:var(--muted);text-align:left;padding:8px 12px;background:var(--panel);font-size:13px}
+.numtable td{padding:10px 12px;border-top:1px solid var(--rule);vertical-align:top}
+.strike{text-decoration:line-through;color:var(--faint)}
+.sched{border-left:4px solid var(--blue);display:grid;grid-template-columns:150px 1fr auto;gap:16px;padding:14px 20px;align-items:center}
+.bigtime{font:600 28px var(--mono);color:var(--head);line-height:1}
+.qtable{width:100%;border-collapse:collapse}
+.qtable th{font-size:13px;font-weight:500;color:var(--muted);text-align:left;padding:10px 12px;background:var(--panel);border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);white-space:nowrap}
+.qtable td{padding:13px 12px;border-bottom:1px solid var(--rule);vertical-align:top;font-size:14px}
+.qtable tr.qrow{cursor:pointer}
+.qtable tr.qrow:hover td{background:var(--panel)}
+.qtable tr.qrow.sel td{background:var(--tint)}
+.qtable tr.qrow.annex td:first-child{box-shadow:inset 3px 0 0 var(--blue)}
+.qtable .nm{font-weight:600;color:var(--ink)}
+.qtable .sub{color:var(--muted);font-size:13px}
+.whychips{display:flex;flex-direction:column;gap:5px;align-items:flex-start;min-width:200px}
+.whychips .chip{white-space:nowrap}
+.numtable td.mono{white-space:nowrap}
+.scorebar{display:flex;align-items:center;gap:10px;justify-content:flex-end}
+.scorebar .track{width:64px;height:6px;border-radius:3px;background:var(--greyt);overflow:hidden}
+.scorebar .fill{height:100%;background:var(--head)}
+.scorebar b{font:600 15px var(--mono);min-width:26px;text-align:right}
+.why{background:var(--panel)}
+.why td{padding:0!important;border-bottom:1px solid var(--rule)}
+.whybox{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;padding:14px 18px 16px 48px}
+.whybox .f{background:var(--surface);border:1px solid var(--rule);border-radius:8px;padding:10px 12px}
+.whybox .f .k{font:600 20px var(--mono);color:var(--head)}
+.whybox .f .l{font-size:12px;color:var(--muted)}
+.tabs{display:flex;gap:4px;flex-wrap:wrap}
+.tabs button{border:1px solid transparent;background:none;border-radius:16px;padding:4px 12px;font-size:13px;color:var(--muted);font-weight:500}
+.tabs button:hover{color:var(--ink)}
+.tabs button[aria-pressed="true"]{background:var(--tint);color:var(--blue-ink);border-color:transparent}
+.search{display:flex;align-items:center;gap:8px;border:1px solid var(--rule);border-radius:8px;padding:0 10px;height:34px;background:var(--surface);color:var(--muted)}
+.search input{border:0;outline:0;background:none;width:170px;color:var(--ink)}
+.done-item{padding:8px 0;border-bottom:1px solid var(--rule);font-size:14px}
+.done-item:last-child{border-bottom:0}
+.done-item .chip{margin-right:6px}
+.bars{display:flex;align-items:flex-end;gap:14px;height:150px;padding:18px 4px 0;position:relative}
+.bars .cap{position:absolute;left:0;right:0;border-top:1.5px dashed var(--faint)}
+.bars .cap span{position:absolute;right:0;top:-18px;font:12px var(--mono);color:var(--faint)}
+.bar{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;justify-content:flex-end;height:100%}
+.bar .stackb{width:100%;max-width:38px;display:flex;flex-direction:column-reverse;border-radius:4px 4px 0 0;overflow:hidden;transition:height .5s}
+.bar .seg{width:100%;transition:height .5s}
+.bar .v{font:600 13px var(--mono)}
+.bar .d{font-size:12px;color:var(--muted)}
+.callout{border-radius:8px;padding:10px 12px;font-size:13.5px}
+.callout.red{background:var(--redt)}
+.callout.blue{background:var(--tint)}
+.callout.green{background:var(--greent)}
+.callout.amber{background:var(--ambert)}
+.thisweek{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;padding:14px 20px}
+
+/* ---------- member ---------- */
+.mtabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
+.mtab{border:1px solid var(--rule);background:var(--surface);border-radius:10px;padding:8px 12px;text-align:left;display:flex;gap:10px;align-items:center;min-width:0}
+.mtab:hover{border-color:var(--faint)}
+.mtab[aria-pressed="true"]{border-color:var(--blue);box-shadow:inset 0 0 0 1px var(--blue)}
+.mtab b{display:block;font-size:14px}
+.mtab span{display:block;font-size:12px;color:var(--muted)}
+.mtab .dot{width:8px;height:8px;border-radius:50%;flex:none}
+.mhead{padding:20px 24px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:18px}
+.mhead h1{font-size:28px;display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.mhead h1 small{font:400 14px var(--sans);color:var(--muted)}
+.sev{display:flex;flex-direction:column;align-items:flex-end;gap:6px;text-align:right}
+.sevsel{display:flex;gap:2px;background:var(--panel);border:1px solid var(--rule);border-radius:8px;padding:2px}
+.sevsel button{border:0;background:none;border-radius:6px;padding:6px 12px;font-weight:600;font-size:14px;color:var(--muted)}
+.sevsel button[aria-pressed="true"][data-v="Stable"]{background:var(--greent);color:var(--green)}
+.sevsel button[aria-pressed="true"][data-v="Watcher"]{background:var(--ambert);color:var(--amber)}
+.sevsel button[aria-pressed="true"][data-v="Unstable"]{background:var(--redfill);color:#fff}
+.timeline{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(150px,1fr);gap:0;position:relative;overflow-x:auto;padding:4px 2px 6px}
+.tl{position:relative;padding:22px 14px 0 0}
+.tl::before{content:"";position:absolute;top:8px;left:0;right:0;height:2px;background:var(--rule)}
+.tl:last-child::before{right:auto;width:30px}
+.tl .node{position:absolute;top:1px;left:0;width:16px;height:16px;border-radius:50%;border:2px solid var(--faint);background:var(--surface)}
+.tl .node::after{content:"";position:absolute;inset:3px;border-radius:50%;background:var(--faint)}
+.tl.risk .node{border-color:var(--red)}.tl.risk .node::after{background:var(--red)}
+.tl.cur .node{border-color:var(--head)}.tl.cur .node::after{background:var(--head)}
+.tl .when{font:12px var(--mono);color:var(--muted);display:block;margin:2px 0 3px}
+.tl .what{font-size:13.5px}
+.facts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0}
+.fact{padding:14px 18px;border-right:1px solid var(--rule)}
+.fact:last-child{border-right:0}
+.fact .l{font-size:13px;color:var(--muted)}
+.fact .v{font:600 18px var(--mono);margin:4px 0 2px}
+.fact .v.warn{color:var(--amber)}
+.fact .v.bad{color:var(--red)}
+.fact .s{font:11.5px/1.45 var(--mono);color:var(--faint)}
+.medtable{width:100%;border-collapse:collapse;font-size:14px}
+.medtable th{text-align:left;font-weight:500;color:var(--muted);font-size:13px;padding:9px 14px;border-bottom:1px solid var(--rule);background:var(--panel)}
+.medtable td{padding:12px 14px;border-bottom:1px solid var(--rule);vertical-align:top}
+.medtable tr:last-child td{border-bottom:0}
+.medtable td.note{color:var(--muted);font-size:13px}
+.actions{list-style:none;margin:0;padding:0;display:grid;gap:14px}
+.actions li{display:grid;grid-template-columns:28px 1fr;gap:10px}
+.actions li .pin{width:26px;height:26px;font-size:13px;cursor:pointer;border:0}
+.actions li.done .pin{background:var(--green)}
+.actions li.done b{text-decoration:line-through;color:var(--muted)}
+.actions li b{display:block;font-size:14.5px}
+.actions li span{color:var(--muted);font-size:13.5px}
+.sit{display:grid;gap:9px;font-size:14px}
+.sticky{position:sticky;bottom:0;z-index:15;margin-top:18px;background:var(--surface);border:1px solid var(--rule);border-radius:12px;padding:12px 18px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.sticky b{color:var(--head)}
+.aifacts{display:flex;gap:6px;flex-wrap:wrap;flex:1}
+.rawtable{width:100%;border-collapse:collapse;font:12.5px var(--mono)}
+.rawtable th{text-align:left;color:var(--muted);font-weight:500;padding:6px 10px;border-bottom:1px solid var(--head)}
+.rawtable td{padding:6px 10px;border-bottom:1px solid var(--rule)}
+.rawtable td.bad{background:var(--redt);color:var(--red)}
+.rawtable td.good{background:var(--greent);color:var(--green)}
+.imp{display:grid;grid-template-columns:24px 1fr;gap:10px;padding:10px 0;border-bottom:1px solid var(--rule);font-size:13.5px}
+.imp:last-child{border-bottom:0}
+.imp .n{font:600 12px var(--mono);color:var(--muted);padding-top:2px}
+.details{border-top:1px solid var(--rule)}
+.details summary{list-style:none;cursor:pointer;padding:12px 20px;display:flex;justify-content:space-between;align-items:center;color:var(--head);font-weight:600}
+.details summary::-webkit-details-marker{display:none}
+.details[open] summary .chev{transform:rotate(180deg)}
+.chev{transition:.15s}
+
+/* ---------- call ---------- */
+.callhead{display:grid;grid-template-columns:auto 1fr auto;gap:24px;padding:16px 22px;border-left:4px solid var(--green);align-items:center}
+.callhead .incall{font:600 30px var(--mono);color:var(--green);line-height:1.1}
+.call-grid{display:grid;grid-template-columns:290px minmax(0,1fr) 330px;gap:18px;align-items:start}
+.items{display:grid;gap:0}
+.item{display:grid;grid-template-columns:24px 1fr;gap:10px;padding:13px 0;border-bottom:1px solid var(--rule)}
+.item:last-child{border-bottom:0}
+.item input{width:18px;height:18px;margin:2px 0 0;accent-color:var(--green)}
+.item b{font-size:14.5px}
+.item p{margin:2px 0 6px;color:var(--muted);font-size:13.5px}
+.atable{width:100%;border-collapse:collapse;font-size:14px}
+.atable th{text-align:left;font-weight:500;color:var(--muted);font-size:13px;padding:9px 12px;background:var(--panel);border-bottom:1px solid var(--rule)}
+.atable td{padding:10px 12px;border-bottom:1px solid var(--rule);vertical-align:top}
+.atable td.src{font:12px/1.45 var(--mono);color:var(--faint);max-width:200px}
+.atable tr.sec td{background:var(--panel);font:600 12px var(--sans);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:7px 12px}
+.atable .q{font-weight:500}
+.atable .cue{font:12px var(--mono);color:var(--faint);margin-top:4px}
+.jin{width:100%;min-width:140px;border:1.5px dashed var(--blue);border-radius:6px;background:var(--surface);padding:6px 8px;font-size:14px}
+.jin:focus{outline:0;border-style:solid}
+.jin.filled{border-style:solid;border-color:var(--rule)}
+.rcheck{border:1px solid var(--rule);background:var(--surface);border-radius:6px;width:26px;height:26px;display:grid;place-items:center;color:var(--faint);padding:0}
+.rcheck[aria-pressed="true"]{background:var(--greent);border-color:transparent;color:var(--green)}
+.notedraft{border:1px solid var(--rule);border-radius:8px;padding:14px 16px;font-size:14px;line-height:1.65;background:var(--panel)}
+.notedraft .br{background:var(--ambert);color:var(--amber);border-radius:4px;padding:0 4px;font-weight:600}
+.notedraft .fill{background:var(--greent);color:var(--green);border-radius:4px;padding:0 4px;font-weight:500}
+.notedraft .srcl{font:12px var(--mono);color:var(--faint);display:block;margin-top:10px}
+.wb{display:grid;gap:8px;font-size:14px}
+.wb > div{display:flex;gap:8px;align-items:flex-start}
+.ba{width:100%;border-collapse:collapse;font-size:14px}
+.ba td,.ba th{padding:8px 10px;border-bottom:1px solid var(--rule);text-align:left}
+.ba th{font-weight:500;color:var(--muted);font-size:13px}
+.ba .t{background:var(--redt);color:var(--red);font:600 13px var(--mono);text-align:center;border-radius:4px}
+.ba .h{background:var(--greent);color:var(--green);font:600 13px var(--mono);text-align:center;border-radius:4px}
+.progress{height:6px;background:var(--greyt);border-radius:3px;overflow:hidden}
+.progress > i{display:block;height:100%;background:var(--green);transition:width .3s}
+
+/* ---------- flag ---------- */
+.vs{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.vs .box{border:1px solid var(--rule);border-radius:10px;padding:16px 18px}
+.vs .box.win{border-color:var(--blue);box-shadow:inset 0 0 0 1px var(--blue)}
+.vs .box .l{color:var(--muted);font-size:13px}
+.vs .box b{display:block;font-size:17px;margin:4px 0 6px;line-height:1.35}
+.sig{width:100%;border-collapse:collapse;font-size:14px}
+.sig th{text-align:left;color:var(--muted);font-weight:500;font-size:13px;padding:9px 12px;background:var(--panel)}
+.sig td{padding:12px;border-bottom:1px solid var(--rule);vertical-align:top}
+.sig td.s{font:12.5px var(--mono);color:var(--faint)}
+
+/* ---------- data ---------- */
+.dgrid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px;align-items:start}
+.dcol{background:var(--surface);border:1px solid var(--rule);border-radius:12px;overflow:hidden}
+.dcol-h{background:var(--navy);color:#fff;padding:12px 14px}
+.dcol-h .k{font:500 12px var(--mono);color:#B9C9F3}
+.dcol-h b{display:block;font-size:15px;margin-top:2px}
+.dcol-b{padding:10px;display:grid;gap:8px}
+.dtile{border:1px solid var(--rule);border-left:3px solid var(--green);border-radius:6px;padding:9px 10px;text-align:left;background:var(--panel);width:100%}
+.dtile:hover{border-color:var(--faint);border-left-color:var(--green)}
+.dtile.lite{border:1px dashed var(--amber);border-left:1px dashed var(--amber);background:var(--surface)}
+.dtile.later{border:1px solid var(--rule);border-left:3px solid var(--faint);background:var(--surface);opacity:.8}
+.dtile b{display:block;font-size:13.5px;line-height:1.3}
+.dtile span{display:block;font:11.5px/1.4 var(--mono);color:var(--muted);margin-top:3px}
+.dtile.dim{opacity:.25}
+.recipe{display:grid;grid-template-columns:64px minmax(0,1fr) auto;gap:14px;padding:14px 18px;border-bottom:1px solid var(--rule);align-items:start}
+.recipe:last-child{border-bottom:0}
+.recipe .id{font:600 14px var(--mono);color:var(--head)}
+.recipe .eq{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px}
+.recipe .in{background:var(--panel);border:1px solid var(--rule);border-radius:12px;padding:2px 9px}
+.recipe .op{color:var(--muted);font:600 13px var(--mono)}
+.recipe .out{background:var(--redt);color:var(--red);border-radius:12px;padding:2px 9px;font-weight:500}
+.recipe .act{font-weight:600}
+.matrix{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.matrix .mc h3{padding:8px 10px;border-radius:6px;font-size:14px}
+.matrix .mc div{padding:8px 10px;border-bottom:1px solid var(--rule);font-size:14px}
+.dclock{display:grid;gap:0;position:relative;padding-left:12px}
+.dclock .s{display:grid;grid-template-columns:110px 1fr;gap:14px;padding:10px 0;border-left:2px solid var(--head);padding-left:16px;margin-left:0}
+.dclock .s.hot{border-left-color:var(--red)}
+.dclock .s .k{font:600 14px var(--mono);color:var(--head)}
+.dclock .s.hot .k{color:var(--red)}
+.ttable{width:100%;border-collapse:collapse;font-size:13.5px}
+.ttable th{text-align:left;font-weight:500;color:var(--muted);font-size:12.5px;padding:8px 10px;background:var(--panel);border-bottom:1px solid var(--rule)}
+.ttable td{padding:9px 10px;border-bottom:1px solid var(--rule);vertical-align:top}
+
+/* ---------- impact ---------- */
+.blocks{display:grid;grid-template-columns:repeat(8,1fr);gap:5px;max-width:330px}
+.blk{aspect-ratio:1;border-radius:4px;background:var(--greyt);transition:background .35s}
+.blk.lost{background:#D46F68}
+.blk.talk{background:var(--blue)}
+.blk.other{background:var(--blk-other)}
+.blk.free{background:var(--surface);box-shadow:inset 0 0 0 1.5px var(--green)}
+.sl{display:grid;grid-template-columns:minmax(0,1fr) 120px 52px;gap:12px;align-items:center;padding:8px 0;border-bottom:1px solid var(--rule);font-size:14px}
+.sl input[type=range]{width:100%;accent-color:var(--blue)}
+.sl output{font:600 14px var(--mono);text-align:right}
+.kpi{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;border:1px solid var(--rule);border-radius:12px;background:var(--surface);overflow:hidden}
+.kpi > div{padding:16px 18px;border-right:1px solid var(--rule)}
+.kpi > div:last-child{border-right:0}
+.kpi .v{font:600 30px var(--mono);color:var(--head);line-height:1.1}
+.kpi .v small{font-size:15px;color:var(--muted);font-weight:500}
+.kpi .l{font-size:13px;color:var(--muted);margin-top:4px}
+.mtree{display:grid;gap:8px}
+.mtree .ns{background:var(--navy);color:#fff;border-radius:10px;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+.mtree .ns b{font:600 28px var(--mono);white-space:nowrap}
+.mrow{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid var(--rule);font-size:14px}
+.mrow span:last-child{font:500 13.5px var(--mono);white-space:nowrap}
+.guard{border:1.5px dashed var(--red);border-radius:10px;padding:10px 14px;font-size:13.5px}
+.phase{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.phase > div{border-top:3px solid var(--blue);padding-top:8px;font-size:13.5px}
+.phase > div:first-child{border-top-color:var(--navy)}
+.phase b{display:block;font:600 12px var(--mono);color:var(--muted)}
+
+/* ---------- overlays ---------- */
+.scrim{position:fixed;inset:0;background:var(--scrim);z-index:80;display:grid;place-items:center;padding:20px;animation:fade .15s}
+@keyframes fade{from{opacity:0}}
+.modal{background:var(--surface);border-radius:14px;width:min(640px,100%);max-height:calc(100vh - 40px);overflow:auto;box-shadow:var(--pop);animation:rise .18s}
+@keyframes rise{from{transform:translateY(8px);opacity:0}}
+.modal-h{padding:20px 24px 8px;display:flex;justify-content:space-between;gap:12px}
+.modal-b{padding:8px 24px 18px}
+.modal-f{padding:14px 24px;border-top:1px solid var(--rule);display:flex;justify-content:flex-end;gap:10px;align-items:center;flex-wrap:wrap}
+.check{display:grid;grid-template-columns:22px 1fr;gap:10px;padding:10px 0;border-bottom:1px solid var(--rule);cursor:pointer}
+.check input{width:18px;height:18px;accent-color:var(--green);margin:1px 0 0}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(460px,100%);background:var(--surface);z-index:85;box-shadow:var(--pop);display:flex;flex-direction:column;animation:slide .2s}
+@keyframes slide{from{transform:translateX(30px);opacity:0}}
+.drawer-h{padding:18px 22px;border-bottom:1px solid var(--rule);display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.drawer-b{padding:8px 22px 24px;overflow:auto;flex:1}
+.ledger{display:grid;grid-template-columns:52px 1fr;gap:10px;padding:12px 0;border-bottom:1px solid var(--rule);font-size:14px}
+.ledger .t{font:500 12.5px var(--mono);color:var(--muted);padding-top:2px}
+.ledger .ft{font:12.5px var(--mono);color:var(--muted);margin-top:4px}
+.ledger .ft s{color:var(--faint)}
+.toasts{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:95;display:grid;gap:8px;justify-items:center;pointer-events:none}
+.toast{background:#0B1638;color:#fff;border-radius:10px;padding:10px 16px;font-size:14px;display:flex;gap:10px;align-items:center;box-shadow:var(--pop);animation:rise .2s;pointer-events:auto;max-width:min(560px,90vw)}
+.toast svg{color:#7FE0B5;flex:none}
+.prov{position:fixed;z-index:99;background:#0B1638;color:#E9EEFA;border-radius:8px;padding:10px 12px;font-size:12.5px;max-width:320px;pointer-events:none;box-shadow:var(--pop);line-height:1.5}
+.prov .pk{font:500 11px var(--mono);color:#8FA6D8;text-transform:uppercase;letter-spacing:.05em}
+.prov .pv{font-family:var(--mono)}
+.palette{width:min(620px,100%);align-self:start;margin-top:10vh}
+.palette input{width:100%;border:0;border-bottom:1px solid var(--rule);padding:16px 20px;font-size:16px;background:none;outline:0}
+.palette ul{list-style:none;margin:0;padding:6px;max-height:50vh;overflow:auto}
+.palette li{padding:9px 14px;border-radius:8px;display:flex;justify-content:space-between;gap:10px;cursor:pointer;font-size:14px}
+.palette li[aria-selected="true"]{background:var(--tint);color:var(--blue-ink)}
+.palette li span{color:var(--muted);font-size:12.5px}
+
+/* tour */
+.spot{position:fixed;z-index:70;border-radius:12px;box-shadow:0 0 0 3px var(--blue),0 0 0 9999px rgba(7,18,46,.42);pointer-events:none;transition:all .35s cubic-bezier(.2,.8,.2,1)}
+.tourcard{position:fixed;z-index:90;right:22px;bottom:22px;width:min(400px,calc(100vw - 32px));background:var(--surface);border-radius:14px;box-shadow:var(--pop);border:1px solid var(--rule);animation:rise .2s}
+.tourcard .tc-h{padding:14px 18px 4px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.tourcard .tc-b{padding:4px 18px 12px}
+.tourcard .tc-b h3{font-size:16px;margin:4px 0 6px}
+.tourcard .tc-b p{margin:0;font-size:14px;color:var(--ink)}
+.tourcard .tc-f{padding:10px 18px 14px;display:flex;align-items:center;gap:8px;justify-content:space-between}
+.dots{display:flex;gap:3px;flex-wrap:wrap;max-width:190px}
+.dots i{width:5px;height:5px;border-radius:50%;background:var(--rule)}
+.dots i.on{background:var(--blue)}
+.stamp{font:600 13px var(--mono);color:var(--blue-ink)}
+.slide{font:500 11.5px var(--mono);color:var(--muted);border:1px solid var(--rule);border-radius:10px;padding:1px 8px}
+
+/* welcome */
+.welcome{width:min(980px,100%);display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);overflow:hidden;padding:0}
+.welcome > div{min-width:0}
+.welcome .l{background:linear-gradient(135deg,#092255,#2B1F77);color:#fff;padding:34px 34px 28px;display:flex;flex-direction:column;gap:14px}
+.welcome .l .eyebrow{color:#A9C2F8}
+.welcome .l h1{color:#fff;font-size:34px;line-height:1.12}
+.welcome .l p{color:#DCE6FD;margin:0;font-size:15.5px}
+.welcome .r{padding:28px 30px;display:flex;flex-direction:column;gap:14px}
+.pillar{display:grid;grid-template-columns:30px 1fr;gap:12px;padding:10px 0;border-bottom:1px solid var(--rule)}
+.pillar b{display:block;font-size:15px;color:var(--head)}
+.pillar span{font-size:13.5px;color:var(--muted)}
+.wblocks{display:grid;grid-template-columns:repeat(16,minmax(0,1fr));width:100%;gap:4px;margin-top:auto;opacity:.9}
+.wblocks i{aspect-ratio:1;border-radius:2px;border:1px solid rgba(255,255,255,.18)}
+.wblocks i.bl{background:rgba(212,111,104,.9);border-color:transparent}
+.wblocks i.bt{background:#5C8BFF;border-color:transparent}
+
+.foot{margin-top:28px;color:var(--faint);font-size:12.5px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.flash{animation:flash 1.4s}
+@keyframes flash{0%{box-shadow:0 0 0 0 rgba(42,106,241,.6)}100%{box-shadow:0 0 0 14px rgba(42,106,241,0)}}
+
+/* ---------- responsive ---------- */
+@media (max-width:1280px){
+  .call-grid{grid-template-columns:300px minmax(0,1fr)}
+  .call-grid > :last-child{grid-column:1 / -1;display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  .dgrid{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media (max-width:1120px){
+  .grid-main,.g2,.g3{grid-template-columns:minmax(0,1fr)}
+  .brand span{display:none}
+  .jump{display:none}
+  .facts{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .fact:nth-child(2){border-right:0}
+  .fact:nth-child(-n+2){border-bottom:1px solid var(--rule)}
+  .welcome{grid-template-columns:1fr}
+  .whybox{grid-template-columns:repeat(2,minmax(0,1fr));padding-left:18px}
+  .matrix{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .kpi{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .kpi > div:nth-child(2){border-right:0}
+  .kpi > div:nth-child(-n+2){border-bottom:1px solid var(--rule)}
+}
+@media (max-width:820px){
+  .app{grid-template-columns:minmax(0,1fr)}
+  .side{position:fixed;top:auto;bottom:0;left:0;right:0;height:60px;flex-direction:row;justify-content:space-around;padding:0 4px}
+  .side .logo,.side .spacer{display:none}
+  .nav{width:auto;flex:1;height:60px}
+  .nav .tip{display:none}
+  .nav[aria-current="true"]::before{left:20%;right:20%;top:0;bottom:auto;width:auto;height:3px;border-radius:0 0 3px 3px}
+  .top{padding:0 16px;gap:8px}
+  .who span{display:none}
+  .main{padding:16px 16px 150px}
+  .call-grid,.vs,.dgrid,.call-grid > :last-child{grid-template-columns:minmax(0,1fr)}
+  .sched{grid-template-columns:1fr}
+  .nowgrid{grid-template-columns:minmax(0,1fr)!important}
+  .numtable{display:block;overflow-x:auto}
+  .nowgrid .btn{white-space:normal;height:auto!important;padding:10px 14px;text-align:left}
+  .sl{grid-template-columns:minmax(0,1fr) 90px 40px}
+  .callhead{grid-template-columns:1fr}
+  .mhead{grid-template-columns:1fr}
+  .sev{align-items:flex-start;text-align:left}
+  .qtable thead{display:none}
+  .qtable,.qtable tbody,.qtable tr,.qtable td{display:block;width:100%}
+  .qtable tr.qrow{border-bottom:1px solid var(--rule);padding:8px 0}
+  .qtable td{border:0;padding:4px 14px}
+  .qtable td.hide-m{display:none}
+  .scorebar{justify-content:flex-start}
+  .medtable,.atable,.sig,.ttable{display:block;overflow-x:auto}
+  .matrix,.kpi{grid-template-columns:minmax(0,1fr)}
+  .kpi > div{border-right:0;border-bottom:1px solid var(--rule)}
+  .phase{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .tourcard{right:16px;bottom:76px}
+  .toasts{bottom:80px}
+  .simclock .sec,.dlong,.tlbl,.brand{display:none}
+  .dshort{display:inline}
+  .clockbox{margin:0 auto 0 0}
+  .who .avatar{display:none}
+  .recipe{grid-template-columns:1fr}
+  .welcome .l h1{font-size:27px}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="side" aria-label="Screens">
+    <div class="logo" aria-hidden="true">MC</div>
+    <button class="nav" data-go="queue"><span data-ic="queue"></span><span class="tip">Queue · who first today</span></button>
+    <button class="nav" data-go="member"><span data-ic="user"></span><span class="tip">Member handoff (I-PASS)</span></button>
+    <button class="nav" data-go="call"><span data-ic="phone"></span><span class="tip">Call &amp; confirm</span></button>
+    <button class="nav" data-go="flag"><span data-ic="flag"></span><span class="tip">Flag review</span></button>
+    <button class="nav" data-go="data"><span data-ic="layers"></span><span class="tip">Data &amp; trust</span></button>
+    <button class="nav" data-go="impact"><span data-ic="chart"></span><span class="tip">Impact &amp; pilot</span></button>
+    <div class="spacer"></div>
+    <button class="nav" data-act="ledger" aria-label="Record of write-backs"><span data-ic="db"></span><span class="tip">Write-back record</span><span class="badge" id="ledgerBadge" hidden>0</span></button>
+  </nav>
+  <div>
+    <header class="top">
+      <div class="brand"><b>MCheck<sup>®</sup> Handoff</b><span>Lakeshore Health Plan · care management</span></div>
+      <div class="clockbox">
+        <div class="simclock" id="simclock" aria-live="off">Monday 9 November, 08:00</div>
+        <div class="jump" role="group" aria-label="Jump to a moment in Maria's Monday">
+          <button data-jump="08:00">08:00</button><button data-jump="08:15">08:15</button><button data-jump="11:00">11:00</button><button data-jump="15:42">15:42</button>
+        </div>
+      </div>
+      <button class="btn sm primary" data-act="tour" id="tourBtn" aria-label="Guided tour"><span data-ic="play"></span><span class="tlbl">Guided tour</span></button>
+      <button class="iconbtn" data-act="palette" aria-label="Search everything (Ctrl K)" title="Search everything (Ctrl K)"><span data-ic="search"></span></button>
+      <button class="iconbtn" data-act="theme" aria-label="Toggle dark mode" title="Toggle dark mode"><span data-ic="moon"></span></button>
+      <div class="who"><span>Maria R., RN <span class="mono">· 48 active cases</span></span><div class="avatar">MR</div></div>
+    </header>
+    <main class="main" id="main" tabindex="-1"></main>
+  </div>
+</div>
+<div id="overlay"></div>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+<div class="prov" id="prov" hidden></div>
+<div id="tour"></div>
+
+<script>
+const ANNEX = {"datasets":[[1,"Member eligibility & demographics","Plan enrollment (EDI 834), CMS MMR","Plan, PCP, language, dual status, address (D1, D3)","Daily","Stale phone/address; blank language; separate Medicaid + MA IDs","Show as-of date; blank language never defaults to English; link IDs via MCheck identity","MVP","Uses the right plan, PCP and language; never calls in English by default","1 Eligibility"],[2,"ADT events","HIE / ADT vendor, HL7 v2 A01/A03/A04 (real-time stream)","Admitted, discharged, in ED right now (D1)","Minutes-hours","No diagnosis (CoP minimum = name, practitioner, facility); duplicates; plans not required recipients","Dedupe by encounter; enrich reason from UM/CCD; start clocks; feeds the NOW lane intraday","MVP","Calls Dwayne's ED while he is there, not 45 days later","2 ADT"],[3,"UM concurrent review notes","Plan's own UM system","Why admitted, discharge plan, intended meds (D2)","Daily during stay","Free text; abbreviations; separate system","AI reads reason + meds with a source link; CM confirms","MVP","Knows why Walter was admitted and which drugs changed, on day 0","3 UM reviews"],[4,"Discharge summary / CCD","HIE, Direct, FHIR DocumentReference (C-CDA)","Discharge meds, diagnoses, pending tests (D2)","Days to never","PDF/fax; free text; med list missing in 2-40% (Kripalani 2007)","Expected-by clock; per-field extraction confidence; never auto-trusted","MVP","Chases a missing summary by D+2 instead of assuming there is none","4 Discharge docs"],[5,"Pharmacy claims (incl. rejects)","PBM, NCPDP (real-time reject stream)","Filled or not, why rejected, days' supply (D2)","Near-daily; varies by channel","Cash fills invisible; 90-day supplies hide gaps; rejects ignored","'No claim is not no'; reject codes surface as actions","MVP","Fixes the rejected HF drug today instead of assuming it was picked up","5 Pharmacy claims"],[6,"Dispensed medication history","Surescripts / PBM history incl. cash","True fill picture (D2)","Daily","Match quality","Resolves false adherence flags","Later (Phase 2)","Stops coaching Gloria on a drug she takes","6 Dispensed history"],[7,"Medical claims","Plan claims (837I/P)","History: diagnoses, visits, utilisation (D1, D2)","30-90 day lag","Lag; billing codes not clinical truth; adjustments","Labelled 'history, not now'; never drives today alone","MVP","Reads history as history; never decides today on a 45-day-old claim","7 Medical claims"],[8,"Lab results","Lab vendors HL7 ORU / LOINC; HIE","A1c, BNP, potassium, eGFR trends (D2)","Days","Mixed units (A1c % vs mmol/mol); missing LOINC; duplicates","Normalise units; trend; flag stale; flag out-of-range before risky drugs","MVP (key panels)","Sees Gloria's A1c is 9.2%; raises Walter's potassium with the prescriber","8 Labs"],[9,"Prior auth / UM decisions","Plan UM (X12 278; FHIR PA API 2027)","Pending/denied service and reason (D5)","Real-time internal","Free-text reasons; disconnected from pharmacy rejects","Medical items: CMS-0057-F clock (72 h / 7 d). Part D drugs: 24 h / 72 h; appeal within 65 days. Linked to rejects","MVP","Chases Rosa's bed decision due 11:00 and Gloria's appeal before 26 Dec","9 Prior auth"],[10,"Appointments & referrals","Referral system; claims/encounters for completed visits; FHIR scheduling where available","Is the follow-up booked or done? (D5)","Variable, often absent","Practice schedules siloed; no-shows create no claim","Completed visits from claims/encounters and booked referrals now; practice schedules Phase 2; 'unknown' shown honestly","MVP-lite","Books the 7-day visit when none is found, instead of assuming it exists","10 Appointments"],[11,"Provider directory & attribution","HiLabs MCheck Directory Accuracy","Right phone/location; is the PCP real? (D5)","Continuous","Ghost listings (CMS review: ~46% of MA listings had errors)","Use MCheck-verified fields; flag ghost PCP","MVP (HiLabs asset)","Sends Dwayne to the FQHC, not to a PCP who left","11 Provider directory"],[12,"Contact points, all sources","Eligibility, pharmacy, ADT PID, provider, member services; FCC Reassigned Numbers Database","Which number will work (D3)","Varies; FCC database monthly","Reassigned (~35M US numbers/yr), wrong person, relative's phone","Rank by recency x past success; FCC check (TCPA safe harbor) + 'wrong person' disposition suppresses","MVP","Dials the number that works; never the stranger's","12 Contact points"],[13,"Contact history incl. member services","Plan telephony / CRM / mail / member-services log","Attempts, who answered, best time (D3)","Real-time","Free-text dispositions; split across departments","Structured codes; learn best hour; one log across departments","MVP","Sees Gloria's discount-card question; calls when people answer","13 Contact history"],[14,"Consent & preferences","CRM, HIPAA authorisations, Part 2 consent","May I text? Who may I speak to? (D3, D4)","Event-based","Missing or expiring authorisations","Gate channels; expiry alerts","MVP","Texts only with consent; speaks to Marisol lawfully; renews before 30 Nov","14 Consent"],[15,"HRA & prior assessments","Plan HRA (SNPs screen housing, food, transport since CY2024)","Self-reported needs, function (D4)","Months (annual)","Stale; self-report","Show age; re-screen on life events","MVP","Re-screens Andre instead of planning around a home he lost","15 HRA"],[16,"SDOH signals","Z-codes, address changes, returned mail; CBO referral platform","Housing/food/transport change (D4)","Varies","Z-codes on <1% of encounters","Positive-only signals","MVP-lite","Refers to housing when a motel address appears","16 SDOH"],[17,"Case record: notes, care plan, tasks","CM system","Goals, barriers, promises (D5)","Real-time","Promises buried in free text","Extract promises as tasks; structured goals (PCO measures MY2027)","MVP","Keeps the scale promise made on 12 Oct","17 Case record"],[18,"Risk scores","Plan models, HCC","Baseline risk (D1)","Monthly","Stale between runs; opaque factors","One input, with reason codes and run date","MVP","Uses risk as one input, knowing its run date","18 Risk scores"],[19,"Quality / care-gap clocks","HEDIS/Stars engine + plan policy","What is due by when (D1, D5)","Daily","Measure logic is not clinical need","Clocks drive urgency, never priority alone","MVP","Works TRC/FMC/FUH due dates before they expire","19 Quality clocks"],[20,"Behavioural health data","BH vendor; psych ADT; Part 2 SUD (consent)","BH follow-up, injection due, restricted records (D2, D4)","Varies","Segmented; consent-dependent","Show existence, hide content until consent","MVP-lite","Co-manages Andre with BH and respects Part 2","20 BH data"],[21,"Medicaid LTSS (duals)","State Medicaid / D-SNP integration","Personal-care hours, waiver services (D4)","Monthly extract","Separate IDs, state formats","Linked via MCheck identity","Later (Phase 2)","Asks for more care hours with evidence","21 LTSS"],[22,"Post-acute, home health, DME","Auth + claims + SNF ADT","Are services actually in place? (D5)","Days","No start-of-care feed","-","Later","Confirms services actually started","9 Prior auth (partial)"],[23,"Remote monitoring","RPM vendor (weight, BP)","HF weight gain (D1, D2)","Daily","Noise","-","Later","Acts on a 2 kg weight gain","-"],[24,"Member/caregiver-reported","SMS, portal, IVR","Symptoms, preferences (D3, D4)","Real-time","Unverified","Shown as member-reported","Later","Uses symptoms the member reports by text","-"],[25,"Caseload & capacity","CM / workforce system","Who owns this case (licence, language, load) (D1)","Real-time","-","Routing + clock-load forecast; same-state licence and language checked","MVP","Moves one call to a float nurse before Tuesday overflows","Queue (48)"],[26,"Death / disenrollment","CMS MMR, SSA-based files","Never call a deceased member's family (D1, D3)","Weekly-monthly lag","Lag","Check before every outreach","MVP (rule)","Never calls a grieving family","-"],[27,"Part D formulary & PA / step flags","Plan formulary file (flags) + PBM criteria documents","Will this discharge drug be rejected? (D2, D5)","Monthly (plan year)","Flags structured; criteria in PDFs","Encode criteria once; check every discharge plan (recipe R13)","MVP","Requests the PA on Friday, before the pharmacy rejects it","22 Plan rules"],[28,"Supplemental benefits & SSBCI eligibility","Plan benefit configuration + Evidence of Coverage","Which plan levers can I order now? (D4, D5)","Plan year","Rules in PDFs; eligibility conditions","Encode; one-click order with eligibility check","MVP-lite","Orders meals, rides and bathroom devices in the same call","22 Plan rules"]],"recipes":[["R1","Not picked up","ADT discharge + discharge meds (CCD or UM note) + no paid fill by D+3, or a reject","New HF drugs not in hand","Call today; resolve reject/PA; pharmacy delivery","Verified if a reject code exists; 'confirm' if only absence","P1","ADT-77298, UM-44191, RX-5571"],["R2","Dangerous overlap","Discharge plan stops lisinopril + post-discharge lisinopril fill + new sacubitril/valsartan","ACE-i + ARNI is contraindicated (angioedema; 36 h washout)","Same day: confirm what's at home; prescriber/pharmacist","Conflict until member confirms","P1","UM-44191, RX-5560, RX-5571"],["R3","Admitted for what?","ADT (no dx) + UM concurrent review + CCD","Reason on day 0, not when the claim lands ~45 days later","Pre-filled reason with source link","AI-extracted: needs confirm","P1, P4","UM-44120, UM-43870"],["R4","Reachable moment","Real-time ED arrival + >=3 failed attempts + facility CM contact (MCheck)","He is reachable now, in the ED","Call the ED case manager while he's there","Verified (A04 without A03)","P3","ADT-78840, DIR Riverbend ED CM"],["R5","Best number","All contact points x outcomes x reassigned check x answer hours","One number + time window, with confidence","Dial in ranked order; suppress reassigned","High when 2 independent recent sources agree","P3, P5","Contact points tab"],["R6","Barrier, not behaviour","Fill gap + PA denial + A1c rising","Access problem, not adherence","Appeal / alternative via prescriber","Verify source of fills","P2","PA-87120, LB-9188"],["R7","False gap","No claims for 70+ days + cash fills (dispensed history or member report)","Probably taking it: 'non-adherent' is wrong","Downgrade flag to 'unknown, ask'","Unknown is not no","P2","RX-6103, MS-9931, MH-0912"],["R8","Life changed","HRA 'stable' (old) + ED/ADT address = motel/shelter + returned mail","Social picture is stale","Re-screen; housing referral","Stale if any life-event signal after HRA date","P3, P4","ADT-74405, LT-1105"],["R9","BH follow-up at risk","Psych discharge + no BH visit by D+7 (no-show feed) + injection overdue","Relapse-risk window","Route with BH co-manager; injection clinic","Verified (vendor feed)","P4","AP-29977, CL-43651"],["R10","Caregiver strain","Dementia + caregiver is the contact + 2 falls/30 d + unchanged care hours + note cue","Caregiver may be overwhelmed","Caregiver check-in; respite/LTSS request","AI-extracted cue: CM judgment required","P5","CA-5301, LTSS row, ADT-77650"],["R11","Split identity","Two HIE identities, name variant, same DOB","Half the history is hidden","Link + steward review; show both meanwhile","Match 0.94 = suggested, not merged","P5","ADT-71108 vs ADT-77650"],["R12","Clock collision","Post-ED contact + FMC + annual HRA + PA + expiring authorisation","One call can close five tasks","Bundle into one call plan","-","P5","Quality clocks tab"],["R13","Predictable reject","UM discharge plan names a drug + Part D formulary flag 'PA required' + no coverage request on file","Will be rejected at the pharmacy (day 0, before discharge)","Expedited (24 h) coverage request via prescriber or hospital CM before discharge","Safety recipe: fires on one source","P1","UM-44191, PL-01, PA-—"],["R14","Hyperkalaemia risk","K+ >= 5.0 + new MRA and/or ARNI (+ eGFR < 60)","Potassium risk before two potassium-raising drugs","Prescriber confirms plan; potassium recheck this week","Safety recipe: fires on one source","P1","LB-9003, LB-9005, UM-44191"],["R15","Drug-related falls","Beers-list sedative + >= 2 falls in 30 days + dementia","A medicine may be causing the falls","Medication review request to PCP (prescriber decides)","Safety recipe: fires on one source","P5","RX zolpidem, ADT-71108, ADT-77650"],["R16","Prescriber loop","Any prescriber action from R2, R13, R14, R15 + no response logged","The loop is open","Drafted, source-grounded prescriber packet (fax/Direct) + 48 h response clock","Draft: clinician sends","P1, P2, P5","Case record"]],"imperf":[[1,"P1","ADT","Duplicate admit message","Counts two admissions","Dedupe by facility + MRN + admit time","Queue"],[2,"P1","ADT","No diagnosis / disposition","Shows 'admitted' with no why","Enrich reason from UM note (AI-extracted, confirm)","Member handoff"],[3,"P1","Discharge summary","Not received by D+2","Silence looks like 'nothing to see'","Expected-not-received chip + request task","Member handoff"],[4,"P1","Pharmacy","Stopped drug auto-refilled during stay","Shows lisinopril as 'adherent'","Conflict chip vs discharge plan; safety flag","Member handoff"],[5,"P1","Pharmacy","New drug rejected (code 75), no PA","Rejects are not shown at all","Reject surfaces as an action; linked to PA tab","Queue + Member handoff"],[6,"P1","Pharmacy","Dose doubled, no new fill","Supply looks fine","Days-left recalculated at new dose (~15 Nov)","Member handoff"],[7,"P1","Claims","Latest claim 46 days old","Claims-based '360' is 6 weeks behind","Claims labelled 'history, not now'","Member handoff"],[8,"P1","Case record","Promise (scale) never kept","Lost in free text","Open promises extracted as tasks","Member handoff"],[9,"P1","Risk score","Monthly model missed the admission","Low priority from a stale score","Score is one input; run date shown","Queue"],[10,"P2","Pharmacy","Cash fills invisible","'Non-adherent' flag","Downgraded to 'unknown'; asks before coaching","Queue + Call & confirm"],[11,"P2","Prior auth","Denial based on the same data gap","Denial accepted as final","Conflict chip; resubmission task with evidence","Member handoff"],[12,"P2","Labs","A1c in % vs mmol/mol","Trend reads 77 vs 7.4","Unit normalisation with both values shown","Member handoff"],[13,"P2","Contact history","Key answer in member-services log","CM never sees it","Cross-department contact timeline","Member handoff"],[14,"P3","Eligibility","Phone reassigned to a stranger","Keeps dialling it","Reassigned check suppresses it","Call & confirm"],[15,"P3","Contact points","Working number only in ADT + pharmacy","Never found","All-source contact ranking","Call & confirm"],[16,"P3","ADT","In ED right now","Learns about it in 45 days","NOW lane: time-boxed reachable moment","Queue"],[17,"P3","Directory","Assigned PCP is a ghost listing","Refers back to a doctor who left","MCheck directory status shown; FQHC suggested","Member handoff"],[18,"P3","Claims vs ADT","4 ED visits in claims, 6 in ADT","Under-counts risk","Event count from ADT, cost from claims","Member handoff"],[19,"P4","BH vendor","No-show creates no claim","FUH looks 'pending', not missed","No-show feed closes the loop","Queue"],[20,"P4","HRA","8-month-old 'stable housing'","Plans around a home he may have lost","Stale chip from life-event signals","Member handoff"],[21,"P4","Consent","Part 2 record restricted","Either leaks it or hides that it exists","Existence shown, content hidden until consent","Member handoff"],[22,"P4","Contact history","Calls at the wrong hour","Repeats morning calls","Learned best window (afternoons) + SMS first","Call & confirm"],[23,"P5","ADT / HIE","Split identity (name variant)","Second fall invisible","MCheck identity link, steward confirms","Member handoff"],[24,"P5","Eligibility","Language blank","Calls in English","Language from notes; interpreter flag","Call & confirm"],[25,"P5","Pharmacy vs ED","ED med list omits zolpidem","Misses the fall-risk drug","Pharmacy fills reconciled against every list","Member handoff"],[26,"P5","Consent","Caregiver authorisation expiring","Call fails on HIPAA grounds next month","Expiry alert, renewal bundled into the call","Call & confirm"],[27,"P5","LTSS","Care hours unchanged 22 months","Not visible to plan CM","Linked Medicaid record (Phase 2); ask coordinator","Member handoff"]],"assess":[[1,"Identity & contact","Member name","1 Eligibility","Copy","✓ Verified","N"],[2,"Identity & contact","Age","1 Eligibility","Derived from DOB","Derived","N"],[3,"Identity & contact","Programme","17 Case record","Derived from case type","Derived","N"],[4,"Identity & contact","Preferred language","1 Eligibility vs 13/14","Newest verified source; never default to English","⇄ Conflict (blank vs Spanish in notes)","N"],[5,"Identity & contact","Interpreter needed","14 Consent","Copy","✓ Verified","N"],[6,"Identity & contact","Best contact + window","12 Contact points","Ranked number + learned hour","✓ Verified (Marisol, 15:30-17:00)","N"],[7,"Caregiver & consent","Primary caregiver","14 Consent","Copy","✓ Verified","N"],[8,"Caregiver & consent","Authorised representative + expiry","14 Consent","Copy; expiry alert","✓ Verified (expires 30 Nov)","N"],[9,"Caregiver & consent","Household (lives with)","15 HRA","Copy","✓ Verified","N"],[10,"Caregiver & consent","Caregiver work schedule","13 Contact history","AI-read from a free-text note","! Confirm (AI-read: 'trabaja de noche')","N"],[11,"Caregiver & consent","Caregiver coping / strain","-","Blank by design","Judgment","Y"],[12,"Utilisation & events","ED visits, last 30 days","2 ADT vs 7 Medical claims","ADT count over claims count","⇄ Conflict (claims 1, ADT 2)","N"],[13,"Utilisation & events","Most recent ED visit + reason","2 ADT + 4 Discharge docs","Identity link suggested (0.94)","! Confirm (steward review pending)","N"],[14,"Utilisation & events","Inpatient stays, last 12 months","7 Medical claims","Copy","✓ Verified (none)","N"],[15,"Utilisation & events","Falls in the past year","15 HRA vs 2 ADT","Newest verified source wins","⇄ Conflict (HRA 0 → ADT 2)","N"],[16,"Utilisation & events","Injury from fall","4 Discharge docs","AI-read from ED summary","! Confirm (scalp contusion, CT negative)","N"],[17,"Conditions & medicines","Active diagnoses","7 Medical claims","Copy, plain words","✓ Verified","N"],[18,"Conditions & medicines","Current medication list","5 Pharmacy claims","Paid fills, last 90 days","✓ Verified","N"],[19,"Conditions & medicines","Medication-list conflicts","5 Pharmacy vs 4 Discharge docs","Reconcile every list","⇄ Conflict (ED list omits zolpidem)","N"],[20,"Conditions & medicines","High-risk medicines (Beers)","5 Pharmacy claims + recipe R15","Rule","✓ Verified (zolpidem)","N"],[21,"Conditions & medicines","New medicine, last 90 days","5 Pharmacy claims","Copy","✓ Verified (zolpidem, 18 Sep)","N"],[22,"Conditions & medicines","Prescriber of the new medicine","5 Pharmacy + 7 Medical claims","Copy","✓ Verified (urgent care)","N"],[23,"Conditions & medicines","PCP + verified phone","1 Eligibility + 11 Provider directory","MCheck-verified fields","✓ Verified (Dr. Ortega)","N"],[24,"Conditions & medicines","Last PCP visit","7 Medical claims","Copy","✓ Verified (11 Aug)","N"],[25,"Function & safety","Help needed with daily activities","15 HRA","Copy with age","! Confirm (HRA 12 months old)","N"],[26,"Function & safety","Cognitive diagnosis","7 Medical claims","Copy","✓ Verified (dementia)","N"],[27,"Function & safety","Night-time confusion","-","Blank by design (note cue shown)","Judgment","Y"],[28,"Function & safety","Home safety (bathroom, stairs)","-","Blank by design","Judgment","Y"],[29,"Function & safety","Equipment in place / pending","9 Prior auth","Copy","✓ Verified (bed + chair pending)","N"],[30,"Function & safety","Pain","-","Blank by design","Judgment","Y"],[31,"Social & services","Housing and food","15 HRA","Copy with age","✓ Verified","N"],[32,"Social & services","Medicine concerns for the prescriber","-","Blank by design","Judgment","Y"],[33,"Social & services","Transport","15 HRA","Copy with age","! Confirm (benefit available)","N"],[34,"Social & services","Medicaid personal-care hours","21 LTSS","Copy","✓ Verified (10 h/week)","N"],[35,"Social & services","Eligible plan benefits","22 Plan rules","Eligibility rules","✓ Verified (bathroom devices, rides)","N"],[36,"Plan & goals","Goals in her and her daughter's words","-","Blank by design","Judgment","Y"],[37,"Plan & goals","Readiness and priorities","-","Blank by design","Judgment","Y"],[38,"Plan & goals","Follow-up visit due date","19 Quality clocks","Derived from ED date + FMC rule","Derived (13 Nov)","N"],[39,"Plan & goals","Clinician's overall risk impression","-","Blank by design","Judgment","Y"],[40,"Plan & goals","Respite / extra help the family wants","-","Blank by design","Judgment","Y"]],"clocks":[["Inpatient discharge (A03)","Member contact","2 business days","Caselet primer / plan policy","Top of queue with countdown","P1"],["Inpatient discharge","Discharge info incl. med list","Day of discharge + 2 days","HEDIS TRC","Request from facility; meds marked 'unverified'","P1 (missing), P4 (late)"],["Discharge with new / changed Rx","Paid pharmacy fill","D+3 [A]; a reject = immediately","Bessette 2026: only 54% (2,626 of 4,873) filled by D+7","'Not picked up' flag","P1"],["Inpatient discharge","Follow-up visit","D+7","Caselet; Hernandez 2010","Book via verified directory","P1"],["Inpatient discharge","Medication reconciliation documented","D+30","HEDIS TRC (RN may perform)","Task","P1"],["ED visit, multiple chronic conditions","Follow-up visit","D+7","HEDIS FMC","Task","P3 (missed), P5"],["Psychiatric discharge","BH follow-up (not same day)","D+7, D+30","HEDIS FUH","Route to BH co-manager","P4"],["Fill with N days' supply","Next fill","N + 7 days grace [A]","PDC logic","Gap flag (check cash fills first)","P2, P3"],["Prior auth submitted: medical item or service","Decision","72 h urgent / 7 days standard","CMS-0057-F (drugs excluded)","Escalate","P5 (DME, due 11:00 today)"],["Part D drug coverage request (PA / step therapy)","Decision","24 h expedited / 72 h standard","CMS Part D coverage rules","Escalate; ask prescriber to request expedited","P1 (none filed), P2"],["Part D coverage denial","Appeal (redetermination) filed","Within 65 days of the notice","CMS Part D appeals","Prescriber appeal task with evidence","P2 (closes 26 Dec 2026)"],["Discharge plan names a drug flagged 'PA required'","Coverage request on file","Before discharge","Plan formulary + UM note (recipe R13)","Flag to UM/TOC nurse and prescriber","P1 (Fri 11:05)"],["Monthly long-acting injection given","Next dose","Monthly time point +/-7 days; > 6 weeks = restart","Paliperidone palmitate label","Book injection clinic; flag prescriber","P4 (window closes 9 Nov; restart after 16 Nov)"],["New or annual SNP member","HRA complete","90 days / 12 months","SNP Model of Care; CA DHCS HRA1","Task","P5"],["Failed outreach attempt","Next attempt on a different number or hour","Next business day [A]","Plan policy","Queue suggestion","P4, P5"]],"queue":[["NOW","P3 Dwayne Pruitt",58,"Complex CM - COPD, high ED use","In Riverbend ED since 07:12","In ED now (until discharge)","Mon 9 Nov 12:00",4,1,0.72,1,5,"Y","N","Y","Y",4,1,100,"Call Riverbend ED case manager (555-0131) now","In facility now; 130-day controller gap; number on file reassigned","NOW"],["SCHED","P5 Rosa Delgado",83,"Complex CM - dementia, falls","ED fall Fri (found via identity link)","Post-ED contact (2 bus. days)","Tue 10 Nov 17:00",33,0.7,0.61,1,4,"N","Y","N","Y",0,0.9,50,"15:35 call to Marisol booked (Spanish interpreter); bundle 5 items; morning: DME PA decision due 11:00","2nd fall in 4 weeks; Beers-list sedative; caregiver strain cue; best window 15:30-17:00","Scheduled"],["1","P1 Walter Okafor",78,"Complex CM - heart failure","Discharged Sat; new HF Rx rejected","Pharmacy reject on discharge Rx","Mon 9 Nov 17:00",9,1,0.38,2,5,"N","Y","N","Y",0,0.9,90,"Call home 555-0142 before noon; then prescriber","Reject code 75, no PA; ACE-i/ARNI overlap; discharge summary missing","Ranked"],["2","P4 Andre Willis",41,"Complex CM - SMI + diabetes","FUH 7-day missed; injection overdue","FUH 7-day (missed 6 Nov)","Fri 6 Nov 23:59",-56,1,0.55,2,5,"N","Y","N","Y",2,0.63,63,"Text now; call after 14:00 with BH co-manager","FUH missed (no-show); LAI overdue; housing stale","Ranked"],["3","Lucia Ferreira",76,"Complex CM - frailty","Discharged Sun (urosepsis)","Post-discharge contact (2 bus. days)","Tue 10 Nov 17:00",33,0.7,0.66,0,4,"N","Y","N","Y",0,0.9,50,"Call daughter; confirm antibiotic course + follow-up","New discharge; high risk; Rx filled","Ranked"],["4","Ernesto Vega",71,"Complex CM - COPD","Discharged Fri (pneumonia)","Post-discharge contact (2 bus. days)","Tue 10 Nov 17:00",33,0.7,0.42,0,3,"N","Y","N","Y",0,0.9,38,"Call; confirm antibiotics picked up (paid 6 Nov)","New discharge; fills on time","Ranked"],["5","Isaac Hughes",84,"Complex CM - frailty","-","Monthly check-in due","Wed 11 Nov 18:00",58,0.4,0.67,0,4,"N","Y","N","Y",0,0.9,29,"Routine call","monthly check-in due; risk 0.67","Ranked"],["5","Tomas Varga",79,"Complex CM - diabetes + CKD","-","Open task due","Wed 11 Nov 21:00",61,0.4,0.58,1,4,"N","Y","N","Y",0,0.9,29,"Routine call","open task due; risk 0.58","Ranked"],["7","Edith Goldberg",68,"Rising risk - CHF","-","Monthly check-in due","Wed 11 Nov 04:00",44,0.7,0.62,0,3,"N","Y","N","Y",2,0.63,26,"Routine call","monthly check-in due; risk 0.62","Ranked"],["7","Edith Lindqvist",73,"Complex CM - heart failure","-","Care-plan review due","Wed 11 Nov 07:00",47,0.7,0.47,0,3,"N","Y","N","Y",2,0.63,26,"Routine call","care-plan review due; risk 0.47","Ranked"],["7","Bernice Akers",67,"Complex CM - post-stroke","-","Post-visit follow-up","Wed 11 Nov 05:00",45,0.7,0.46,0,3,"N","Y","N","Y",3,0.63,26,"Routine call","post-visit follow-up; risk 0.46","Ranked"],["10","Harold Bennett",69,"Complex CM - COPD","Discharged Sat (COPD exacerbation)","Post-discharge contact (2 bus. days)","Tue 10 Nov 17:00",33,0.7,0.36,0,2,"N","Y","N","Y",0,0.9,25,"Call; inhaler technique + follow-up","New discharge; inhaler filled 7 Nov","Ranked"],["11","Joan Whitfield",80,"Complex CM - frailty","Discharged Sun to SNF (hip fracture)","SNF transition contact","Thu 12 Nov 17:00",81,0.4,0.58,0,3,"N","Y","N","Y",0,0.9,22,"Call SNF social worker; confirm care plan + expected stay","Transition to SNF; facility reachable","Ranked"],["11","Henry Tran",73,"Rising risk - diabetes","-","Open task due","Fri 13 Nov 04:00",92,0.4,0.45,0,3,"N","Y","N","Y",0,0.9,22,"Routine call","open task due; risk 0.45","Ranked"],["11","Elijah Hughes",87,"Complex CM - COPD","-","Refill gap check","Thu 12 Nov 10:00",74,0.4,0.33,1,3,"N","Y","N","Y",0,0.9,22,"Routine call","refill gap check; risk 0.33","Ranked"],["14","Margaret Esposito",70,"Rising risk - diabetes","-","Post-visit follow-up","Thu 12 Nov 02:00",66,0.4,0.66,0,4,"N","Y","N","Y",2,0.63,20,"Routine call","post-visit follow-up; risk 0.66","Ranked"],["15","Calvin Mwangi",85,"Complex CM - frailty","-","Post-visit follow-up","Thu 12 Nov 09:00",73,0.4,0.66,0,4,"N","N","Y","Y",4,0.5,16,"Try alternate number / SMS","post-visit follow-up; risk 0.66; unreachable - alternate channel","Ranked"],["15","Bernice Ibarra",72,"Complex CM - oncology support","-","Refill gap check","Fri 13 Nov 07:00",95,0.4,0.59,1,4,"N","N","N","Y",3,0.5,16,"Letter + CHW / PCP office outreach","refill gap check; risk 0.59; unreachable - alternate channel","Ranked"],["17","Dolores Castillo",84,"Complex CM - ESRD","-","Post-visit follow-up","Wed 11 Nov 18:00",58,0.4,0.42,0,3,"N","Y","N","Y",3,0.63,15,"Routine call","post-visit follow-up; risk 0.42","Ranked"],["17","Stanley Sato",92,"Complex CM - heart failure","-","Care-plan review due","Wed 11 Nov 09:00",49,0.4,0.38,0,3,"N","Y","N","Y",2,0.63,15,"Routine call","care-plan review due; risk 0.38","Ranked"],["19","Raymond Barros",73,"Complex CM - diabetes + CKD","-","Care-plan review due","Fri 13 Nov 05:00",93,0.4,0.55,0,3,"N","N","Y","Y",4,0.5,12,"Try alternate number / SMS","care-plan review due; risk 0.55; unreachable - alternate channel","Ranked"],["20","Ramon Akers",79,"Complex CM - post-stroke","-","Refill gap check","Wed 11 Nov 16:00",56,0.4,0.19,0,2,"N","Y","N","Y",2,0.63,10,"Routine call","refill gap check; risk 0.19","Ranked"],["20","Tomas Nakamura",71,"Complex CM - heart failure","-","Open task due","Thu 12 Nov 23:00",87,0.4,0.16,0,2,"N","Y","N","Y",2,0.63,10,"Routine call","open task due; risk 0.16","Ranked"],["22","Lorraine Pierce",69,"Complex CM - post-stroke","-","Open task due","Wed 11 Nov 17:00",57,0.4,0.35,0,2,"N","Y","N","N",1,0.54,9,"Routine call","open task due; risk 0.35","Ranked"],["23","Esther Lindqvist",88,"Complex CM - COPD","-","Care-plan review due","Wed 11 Nov 15:00",55,0.4,0.34,0,2,"N","N","Y","Y",4,0.42,7,"Try alternate number / SMS","care-plan review due; risk 0.34; unreachable - alternate channel","Ranked"],["24","Frank Brennan",68,"Rising risk - CHF","-","Open task due","Wed 11 Nov 13:00",53,0.4,0.26,0,2,"N","Y","N","N",2,0.38,6,"Routine call","open task due; risk 0.26","Ranked"],["24","Hector Mwangi",66,"Complex CM - oncology support","-","Refill gap check","Thu 12 Nov 10:00",74,0.4,0.21,0,2,"N","Y","N","N",2,0.38,6,"Routine call","refill gap check; risk 0.21","Ranked"],["26","Ramon Brennan",68,"Complex CM - COPD","-","Monthly check-in due","Tue 17 Nov 21:00",205,0.1,0.63,0,4,"N","Y","N","Y",2,0.63,5,"Routine call","monthly check-in due; risk 0.63","Ranked"],["26","Henry Quinlan",66,"Rising risk - CHF","-","Care-plan review due","Sat 14 Nov 22:00",134,0.1,0.4,0,3,"N","Y","N","Y",1,0.9,5,"Routine call","care-plan review due; risk 0.40","Ranked"],["28","Yolanda Fairbanks",79,"Complex CM - heart failure","-","Refill gap check","Sat 14 Nov 16:00",128,0.1,0.68,0,4,"N","N","Y","Y",3,0.5,4,"Try alternate number / SMS","refill gap check; risk 0.68; unreachable - alternate channel","Ranked"],["28","Yolanda Lindqvist",83,"Complex CM - COPD","-","Annual HRA due","Tue 17 Nov 15:00",199,0.1,0.33,0,2,"N","Y","N","Y",1,0.9,4,"Routine call","annual hra due; risk 0.33","Ranked"],["28","Raymond Whitcomb",87,"Complex CM - post-stroke","-","Care-plan review due","Wed 11 Nov 00:00",40,0.7,0.3,0,2,"N","N","N","N",3,0.13,4,"Letter + CHW / PCP office outreach","care-plan review due; risk 0.30; unreachable - alternate channel","Ranked"],["28","Curtis Fairbanks",90,"Rising risk - diabetes","-","Post-visit follow-up","Fri 13 Nov 10:00",98,0.1,0.25,0,2,"N","Y","N","Y",0,0.9,4,"Routine call","post-visit follow-up; risk 0.25","Ranked"],["32","Carmen Lindqvist",87,"Complex CM - post-stroke","-","Refill gap check","Fri 13 Nov 11:00",99,0.1,0.6,0,3,"N","N","N","N",2,0.5,3,"Letter + CHW / PCP office outreach","refill gap check; risk 0.60; unreachable - alternate channel","Ranked"],["32","Stanley Castillo",88,"Rising risk - CHF","-","Monthly check-in due","Tue 17 Nov 06:00",190,0.1,0.57,0,3,"N","Y","N","N",2,0.5,3,"Routine call","monthly check-in due; risk 0.57","Ranked"],["32","Gwen Sato",75,"Complex CM - post-stroke","-","Post-visit follow-up","Sun 15 Nov 12:00",148,0.1,0.52,0,3,"N","N","N","Y",3,0.5,3,"Letter + CHW / PCP office outreach","post-visit follow-up; risk 0.52; unreachable - alternate channel","Ranked"],["32","Frank Yates",82,"Complex CM - COPD","-","Annual HRA due","Fri 20 Nov 05:00",261,0.1,0.38,0,3,"N","N","Y","Y",3,0.42,3,"Try alternate number / SMS","annual hra due; risk 0.38; unreachable - alternate channel","Ranked"],["32","Anita Mwangi",67,"Complex CM - COPD","-","Annual HRA due","Sun 6 Dec 09:00",649,0.1,0.31,1,3,"N","N","Y","Y",4,0.42,3,"Try alternate number / SMS","annual hra due; risk 0.31; unreachable - alternate channel","Ranked"],["32","Sylvia Iwu",92,"Complex CM - heart failure","-","Refill gap check","Thu 12 Nov 22:00",86,0.4,0.21,0,2,"N","N","N","Y",4,0.21,3,"Letter + CHW / PCP office outreach","refill gap check; risk 0.21; unreachable - alternate channel","Ranked"],["32","Arturo Delacroix",67,"Complex CM - COPD","-","Annual HRA due","Sat 21 Nov 14:00",294,0.1,0.17,0,2,"N","Y","N","Y",3,0.63,3,"Routine call","annual hra due; risk 0.17","Ranked"],["39","Sylvia Whitcomb",74,"Complex CM - heart failure","-","Post-visit follow-up","Sat 14 Nov 08:00",120,0.1,0.37,0,2,"N","Y","N","N",0,0.54,2,"Routine call","post-visit follow-up; risk 0.37","Ranked"],["39","P2 Gloria Mensah",67,"Rising risk - diabetes + CKD","'Non-adherence' flag (downgraded: cash fills suspected)","Part D adherence (year-end)","Thu 31 Dec 23:59",1264,0.1,0.31,0,2,"N","Y","N","N",1,0.54,2,"This week: text, call 16:00-16:30; confirm metformin source; prescriber appeals by 26 Dec","Right member, wrong problem: flag downgraded; PA denied on missing data; A1c 9.2%","This week"],["39","Lloyd Moreau",68,"Complex CM - frailty","-","Open task due","Fri 13 Nov 12:00",100,0.1,0.29,0,2,"N","N","Y","Y",2,0.42,2,"Try alternate number / SMS","open task due; risk 0.29; unreachable - alternate channel","Ranked"],["39","Victor Cordero",73,"Complex CM - post-stroke","-","Annual HRA due","Tue 24 Nov 02:00",354,0.1,0.27,0,2,"N","Y","N","N",1,0.54,2,"Routine call","annual hra due; risk 0.27","Ranked"],["39","Patricia Brennan",83,"Rising risk - CHF","-","Monthly check-in due","Sat 14 Nov 19:00",131,0.1,0.25,0,2,"N","Y","N","N",3,0.38,2,"Routine call","monthly check-in due; risk 0.25","Ranked"],["44","Esther Ellison",68,"Rising risk - CHF","-","Care-plan review due","Wed 18 Nov 05:00",213,0.1,0.32,0,2,"N","N","N","Y",2,0.21,1,"Letter + CHW / PCP office outreach","care-plan review due; risk 0.32; unreachable - alternate channel","Ranked"],["44","Bernice Castillo",78,"Complex CM - ESRD","-","Post-visit follow-up","Sun 15 Nov 06:00",142,0.1,0.28,0,2,"N","N","N","Y",5,0.21,1,"Letter + CHW / PCP office outreach","post-visit follow-up; risk 0.28; unreachable - alternate channel","Ranked"],["44","Carmen Ellison",90,"Complex CM - oncology support","-","Annual HRA due","Sun 6 Dec 01:00",641,0.1,0.27,0,2,"N","N","N","Y",4,0.21,1,"Letter + CHW / PCP office outreach","annual hra due; risk 0.27; unreachable - alternate channel","Ranked"]]};
+</script>
+<script>
+"use strict";
+/* =========================================================
+   Icons (inline SVG, never font glyphs)
+   ========================================================= */
+const P = {
+  queue:'<path d="M4 6h16M4 12h16M4 18h10"/>',
+  user:'<circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/>',
+  phone:'<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/>',
+  flag:'<path d="M5 21V4M5 4h11l-2 4 2 4H5"/>',
+  layers:'<path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m3 13 9 5 9-5"/>',
+  chart:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+  db:'<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>',
+  play:'<path d="M7 5v14l11-7z" fill="currentColor" stroke="none"/>',
+  search:'<circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/>',
+  moon:'<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z"/>',
+  check:'<path d="m5 12.5 4.5 4.5L19 7.5"/>',
+  bang:'<path d="M12 5v9"/><circle cx="12" cy="18.5" r="1.3" fill="currentColor" stroke="none"/>',
+  swap:'<path d="M4 8h14l-3.5-3.5M20 16H6l3.5 3.5"/>',
+  clock:'<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+  none:'<circle cx="12" cy="12" r="8.5"/><path d="m6 18 12-12"/>',
+  x:'<path d="m6.5 6.5 11 11M17.5 6.5l-11 11"/>',
+  arrow:'<path d="M5 12h14M13 6l6 6-6 6"/>',
+  chev:'<path d="m6 9 6 6 6-6"/>',
+  msg:'<path d="M4 5h16v11H9l-5 4z"/>',
+  close:'<path d="m6 6 12 12M18 6 6 18"/>',
+  lock:'<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
+  spark:'<path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6"/>',
+  link:'<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
+  sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5 19 19M5 19l1.5-1.5M17.5 6.5 19 5"/>',
+  pen:'<path d="M4 20h4L19 9l-4-4L4 16z"/>',
+  home:'<path d="M3 11 12 4l9 7M5 10v10h14V10"/>'
+};
+function ic(n,s=18){return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[n]||''}</svg>`}
+document.querySelectorAll('[data-ic]').forEach(e=>e.outerHTML=ic(e.dataset.ic,e.closest('.nav')?22:16));
+
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const KIND = {ok:['ok','check'],confirm:['confirm','bang'],conflict:['conflict','swap'],expected:['expected','clock'],unknown:['unknown','none'],
+  done:['ok','check'],suppressed:['unknown','x'],corrected:['conflict','swap'],judg:['judg','pen'],writeback:['ok','check'],steward:['confirm','bang'],derived:['unknown','spark']};
+/* chip(kind, text, prov) – prov = "Source|Received|Note" shown on hover */
+function chip(kind,text,prov,extra=''){
+  const [cls,i]=KIND[kind]||['unknown','none'];
+  return `<span class="chip ${cls} ${extra}" ${prov?`data-prov="${esc(prov)}" tabindex="0"`:''}>${ic(i,14)}${text}</span>`;
+}
+function lchip(kind,text,prov){ // outlined fact chip, as on the queue
+  const m={ok:'',confirm:'c',conflict:'p',expected:'e'}[kind]||'';
+  const i={ok:'check',confirm:'bang',conflict:'swap',expected:'clock',unknown:'none'}[kind]||'check';
+  return `<span class="chip line ${m}" ${prov?`data-prov="${esc(prov)}" tabindex="0"`:''}>${ic(i,14)}${text}</span>`;
+}
+const tag = (t='Act today') => `<span class="tag">${ic('x',13)}${t}</span>`;
+const pin = (n,o) => `<span class="pin ${o?'o':''}">${n}</span>`;
+
+/* =========================================================
+   State
+   ========================================================= */
+const S = {
+  screen:'queue', member:'walter', t:8*3600, running:true,
+  dwayneDone:false, rebalanced:false, whyOpen:{}, showAll:false, qfilter:'all', qsearch:'',
+  severity:{walter:'Watcher',dwayne:'Watcher',andre:'Watcher',rosa:'Watcher',gloria:'Stable'},
+  aiConfirmed:{}, actionsDone:{}, handoffConfirmed:{},
+  call:{items:{0:true,1:true}, read:{}, j:{}, saved:false, endT:null, filter:'need'},
+  flag:null, tasks:[], ledger:[], dataTab:'datasets', dfilter:'all', dsel:null, rfilter:'all', ifilter:'all',
+  tm:{triage:30,prep:12,failed:18,doc:35}, tour:null
+};
+try{const th=localStorage.getItem('mc-theme'); if(th) document.documentElement.dataset.theme=th;}catch(e){}
+
+const hm = s => {const h=Math.floor(s/3600)%24,m=Math.floor(s/60)%60;return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`};
+const toS = hhmm => {const [h,m]=hhmm.split(':').map(Number);return h*3600+m*60};
+const nowStr = () => hm(S.t);
+
+function log(what, from, to, scope, kind='writeback'){
+  S.ledger.unshift({t:nowStr(),what,from,to,scope,kind});
+  const b=document.getElementById('ledgerBadge'); b.hidden=false; b.textContent=S.ledger.length;
+}
+function toast(msg){
+  const el=document.createElement('div'); el.className='toast'; el.innerHTML=ic('check',16)+`<span>${msg}</span>`;
+  document.getElementById('toasts').appendChild(el); setTimeout(()=>{el.style.opacity='0';el.style.transition='.3s'},3600); setTimeout(()=>el.remove(),4000);
+}
+
+/* =========================================================
+   Members: the five annex patients (fictional)
+   ========================================================= */
+const M = {
+walter:{
+  key:'walter', name:'Walter Okafor', age:78, plan:'MA-HMO', id:'LHP-M-20431', prog:'Complex CM, heart failure · since Mar 2026', color:'var(--red)',
+  scenario:'Fresh heart-failure discharge (Saturday)', stresses:'Timeliness, conflicting med lists, absence',
+  sevNote:'Fresh HF discharge, new drug not in hand, no scale at home',
+  headline:`Discharged <b>Saturday 7 Nov 11:40</b> from Riverbend General after 4 days for <b>acute on chronic systolic heart failure</b>`,
+  reason:{ai:'reason', text:'From UM review 4 Nov · AI-read', prov:'UM concurrent review UM-44120|Received 4 Nov, 16:02 (same day)|ADT carried no diagnosis; AI read the reason from the UM note. Confirm before it becomes a fact.'},
+  contact:'Authorised rep: Grace (wife) · Best: home <span class="mono">(614) 555-0142</span>, 9–12 · PCP Dr. H. Ruiz · Cardiology Dr. S. Price',
+  tlTitle:'Patient summary: what changed since your call on 12 Oct', tlNote:'latest claim 24 Sep (46 days old) · not used for “now”',
+  timeline:[
+    {w:'12 Oct',x:'Your call: no scale; you promised one',k:''},
+    {w:'3 Nov 21:14',x:'ED, then admitted (BNP 1,840)',k:'risk'},
+    {w:'6 Nov 11:05',x:'UM names the new HF drug; formulary says PA, none filed',k:'risk'},
+    {w:'7 Nov 11:40',x:'Discharged home with Grace',k:'cur'},
+    {w:'7 Nov 15:10',x:'Pharmacy rejects the new HF drug',k:'risk'}],
+  facts:[
+    {l:'BNP',v:'1,840 › 610 pg/mL',s:'3 Nov › 6 Nov · HIE, arrived Sat 20:00',prov:'Lab feed via HIE (LOINC 30934-4)|Sat 7 Nov 20:00 — weekend batch, 4 days late|Falling, still high'},
+    {l:'Potassium',v:'5.1 mmol/L',cls:'warn',s:'6 Nov · above range (3.5–5.0) · before 2 K-raising drugs',prov:'Lab feed via HIE|Sat 7 Nov 20:00|Recipe R14: start an MRA only if K+ < 5.0 (2022 AHA/ACC/HFSA)'},
+    {l:'eGFR',v:'48',s:'6 Nov · CKD 3a',prov:'Lab feed via HIE|Sat 7 Nov 20:00|Normalised units'},
+    {l:'Readmission risk',v:'0.38',cls:'muted',s:'model run 1 Nov · has not seen this stay',prov:'Plan risk model (monthly)|Run 1 Nov|One input to the queue, never the whole story'}],
+  medTitle:'Medicines: discharge plan vs pharmacy', medNote:'plan: UM note 6 Nov · AI-read · confirm · fills: PBM, live',
+  meds:[
+    {n:'lisinopril 20 mg',b:'1 daily',p:'<b>Stopped</b> 5 Nov',ph:'90-day refill shipped 4 Nov (mail order, auto-refill)',st:['conflict','Conflict'],note:'Must not overlap with sacubitril/valsartan: 36 h washout',prov:'PBM claim RX-5560 vs UM-44191|Claim paid 4 Nov (while inpatient)|Recipe R2: dangerous overlap'},
+    {n:'sacubitril/valsartan 24/26 mg',b:'—',p:'<b>New</b>, twice daily',ph:'<b>Rejected 7 Nov 15:10</b> · code 75, prior auth required',st:['act','Not in hand'],note:'Started in hospital 6 Nov; no coverage request on file',prov:'PBM real-time reject RX-5571|7 Nov 15:10 (minutes)|Recipe R13: predictable since Fri 11:05'},
+    {n:'spironolactone 25 mg',b:'—',p:'<b>New</b>, 1 daily',ph:'No fill yet',st:['expected','Expected by Tue'],note:'K+ 5.1: ask the prescriber before the first dose',prov:'Expectation clock|D+3 = Tue 10 Nov|Only 54% of new HF prescriptions are filled by D+7 (Bessette 2026)'},
+    {n:'furosemide 40 mg',b:'1 daily',p:'<b>Changed</b> to twice daily',ph:'30 tabs on 20 Oct, runs out ~15 Nov at new dose',st:['confirm','Confirm dose'],note:'Which dose is he taking?',prov:'PBM claim 20 Oct + UM note|Days-left recalculated at the new dose|Doubled dose, no new fill'},
+    {n:'metoprolol succinate 50 mg',b:'1 daily',p:'Unchanged',ph:'Filled 20 Oct',st:['ok','Verified'],note:'',prov:'PBM claim|20 Oct|Fresh, sources agree'}],
+  actions:[
+    {b:'Call Walter and Grace before noon',s:'First: what has he taken since Saturday? Any lisinopril from the new bottle? Which furosemide dose?'},
+    {b:'Call prescriber: overlap, prior auth, potassium',s:'36 h washout between the two drugs. Ask for an expedited (24 h) coverage request or a switch today. K+ 5.1 before spironolactone + ARNI: confirm the plan, recheck this week. Dr. S. Price (614) 555-0152'},
+    {b:'Send the prescriber packet',s:'Drafted: reject code 75, refill date, K+ 5.1, sources attached · reply clock 48 h'},
+    {b:'Book cardiology within 7 days',s:'Northgate Heart Clinic holds post-discharge slots Tue/Thu'},
+    {b:'Order the scale; offer meals',s:'Scale promised 12 Oct, 21 days overdue · post-discharge meals: plan benefit, 14 days'}],
+  aside:'Set aside: asking the pharmacy to call the prescriber (slower; misses the lisinopril at home); waiting for the discharge summary (window closes tonight).',
+  situation:[
+    ['expected','Expected','Discharge summary, due tonight 23:59 (TRC). Requested from Riverbend 06:00'],
+    ['unknown','Unknown','Cardiology appointment booked? No scheduling feed: ask on the call'],
+    ['expected','Expected','Prescriber reply to the packet, due Wed 08:15']],
+  ifthen:'If weight up 2 lb in a day, more breathless or swollen: same-day call to cardiology; ED if severe.',
+  ai:[{id:'reason',l:'Reason for admission',d:'Acute on chronic systolic heart failure — read from UM review 4 Nov'},
+      {id:'meds',l:'Discharge medicine list',d:'5 medicines read from UM note 6 Nov: lisinopril stopped; sacubitril/valsartan, spironolactone new; furosemide doubled'},
+      {id:'order',l:'Action order',d:'Member first (what is in hand), then prescriber, packet, cardiology, scale'}],
+  stars:['TRC (1)','Readmissions (3)'], recipes:['R1','R2','R3','R13','R14','R16'], P:'P1'
+},
+dwayne:{
+  key:'dwayne', name:'Dwayne Pruitt', age:58, plan:'D-SNP', id:'LHP-D-40912', prog:'Complex CM, COPD · full dual (disability)', color:'var(--red)',
+  scenario:'Unreachable frequent ED user', stresses:'Reachability, contact identity',
+  sevNote:'In the ED right now, short of breath; controller inhaler gap 130 days',
+  headline:`In <b>Riverbend General ED since 07:12</b>, short of breath. No discharge message yet, so he is still there`,
+  reason:{text:'ADT A04 · no diagnosis in alert',prov:'ADT-78840 (HL7 A04)|Received 07:13 (1 min)|Reachable-moment recipe R4 fires on A04 without A03'},
+  contact:'Number on file belongs to a stranger · New: <span class="mono">(614) 555-0119</span> (ADT + pharmacy) · ED case manager <span class="mono">(614) 555-0131</span> · PCP: ghost listing',
+  tlTitle:'Patient summary: what changed since the last successful contact (May)', tlNote:'claims show 4 ED visits; ADT shows 6',
+  timeline:[
+    {w:'2 Jul',x:'Controller inhaler last filled (umeclidinium/vilanterol)',k:'risk'},
+    {w:'21 Jul',x:'Number on file disconnected, later reassigned',k:'risk'},
+    {w:'15 Aug',x:'Assigned PCP left the practice (MCheck directory)',k:''},
+    {w:'20 Oct',x:'Call to 555-0115: “wrong person, no Dwayne here”',k:'risk'},
+    {w:'29 Oct',x:'ED: “ran out months ago”; prednisone; new number in PID',k:'risk'},
+    {w:'Today 07:12',x:'ED arrival, short of breath — reachable now',k:'cur'}],
+  facts:[
+    {l:'ED visits since June',v:'6',cls:'bad',s:'ADT 6 vs claims 4 · count from ADT, cost from claims',prov:'ADT vs medical claims|ADT minutes; claims 30–90 day lag|Imperfection 18'},
+    {l:'Controller inhaler gap',v:'130 days',cls:'bad',s:'last fill 2 Jul · albuterol 2 Aug, 27 Sep, 31 Oct',prov:'PBM claims|Daily|Rescue use rising while controller is absent'},
+    {l:'FMC 7-day (29 Oct ED)',v:'Missed',cls:'warn',s:'today’s visit opens a new D+7 clock',prov:'Quality clocks (HEDIS FMC)|Daily|COPD + depression qualify him'},
+    {l:'Housing (HRA)',v:'“stable”',cls:'muted',s:'Mar 2025 · 20 months old · Z59.01 on 27 Sep claim',prov:'HRA Mar 2025 vs claim Z-code 27 Sep|Stale|Recipe R8: life changed'}],
+  numbers:true,
+  medTitle:'Medicines: what the ED should send him home with', medNote:'fills: PBM, live · ED summary 29 Oct · AI-read',
+  meds:[
+    {n:'umeclidinium/vilanterol (controller)',b:'1 inhalation daily',p:'“Resume” (ED 29 Oct)',ph:'Last filled 2 Jul',st:['act','Gap 130 days'],note:'Ask the ED to send him home with it today',prov:'ED summary 29 Oct (free text) + PBM|AI-read: “patient reports he ran out months ago”|Likely driver of the ED pattern'},
+    {n:'albuterol (rescue)',b:'as needed',p:'—',ph:'2 Aug, 27 Sep, 31 Oct',st:['confirm','Rising use'],note:'Rescue use rising while controller absent',prov:'PBM claims|Daily|'},
+    {n:'prednisone burst',b:'—',p:'5 days (29 Oct)',ph:'Filled 29 Oct',st:['ok','Verified'],note:'',prov:'PBM claim|29 Oct|'}],
+  actions:[
+    {b:'Call Riverbend ED case manager now',s:'(614) 555-0131, pulled from MCheck directory. Window closes at ED discharge.'},
+    {b:'Confirm the new number and text consent',s:'555-0119 appears in ADT today and the pharmacy profile on 31 Oct; never dialled'},
+    {b:'Controller inhaler before he leaves',s:'Umeclidinium/vilanterol, unfilled since July'},
+    {b:'Warm handoff to Eastfield FQHC; offer a ride',s:'Assigned PCP left in August (ghost listing). Eastfield is MCheck-verified and has CHWs. Rides: D-SNP transport benefit.'}],
+  aside:'Set aside: texting 555-0119 first (no SMS consent yet); calling the shelter desk (low yield).',
+  situation:[
+    ['expected','Expected','ED discharge (A03): when it lands, the window closes → switch to text + FQHC CHW'],
+    ['expected','Expected','FMC follow-up visit by D+7 after today’s ED visit'],
+    ['unknown','Unknown','Current address: eligibility says 45 Orchard St; shelter in case notes']],
+  ifthen:'If A03 arrives before you reach the ED: text 555-0119 (after consent) and route to the Eastfield CHW.',
+  ai:[{id:'ran-out',l:'“Ran out months ago”',d:'Read from ED summary 29 Oct free text'},{id:'newnum',l:'555-0119 is Dwayne’s',d:'Two independent recent sources agree (ADT PID, pharmacy profile)'}],
+  stars:['FMC (1)'], recipes:['R4','R5','R8'], P:'P3'
+},
+andre:{
+  key:'andre', name:'Andre Willis', age:41, plan:'D-SNP', id:'LHP-D-42230', prog:'Complex CM, schizoaffective disorder + diabetes · full dual', color:'var(--amber)',
+  scenario:'Serious mental illness + housing instability', stresses:'Stale social data, consent, missed clocks',
+  sevNote:'Missed 7-day BH follow-up; injection window closes today',
+  headline:`Psychiatric stay at <b>Willowmere 21–30 Oct</b>; ED at Northgate 2 Nov gave a <b>motel address</b>`,
+  reason:{ai:'reason', text:'Discharge summary 3 Nov · scanned PDF · AI-read',prov:'Discharge doc (scanned PDF)|Received 3 Nov, after the TRC window|“LAI due 11/2; FUH appt 11/4 Lakeside”'},
+  contact:'Mobile <span class="mono">(614) 555-0124</span> · answers afternoons · SMS consent yes · BH co-manager: Jordan Ellis',
+  tlTitle:'Patient summary: what changed since psychiatric discharge', tlNote:'no-shows never become claims',
+  timeline:[
+    {w:'5 Oct',x:'Last long-acting injection (J2426)',k:''},
+    {w:'21–30 Oct',x:'Psychiatric stay, Willowmere',k:'risk'},
+    {w:'2 Nov',x:'ED Northgate: glucose 412; address Starlite Motel',k:'risk'},
+    {w:'3 & 5 Nov',x:'Morning calls: voicemail full',k:''},
+    {w:'4 Nov',x:'FUH appointment: no-show (BH vendor)',k:'risk'},
+    {w:'5 Nov',x:'Returned mail: “moved, left no address”',k:'risk'}],
+  facts:[
+    {l:'FUH 7-day',v:'Missed',cls:'bad',s:'due 6 Nov · 30-day open to 29 Nov',prov:'BH vendor no-show feed + HEDIS FUH|Vendor feed, next day|Claims-based tools still show “pending”'},
+    {l:'Injection window',v:'Closes today',cls:'bad',s:'after 16 Nov (6 weeks) = two-injection restart',prov:'Medical claim J2426 5 Oct + label rule|Clock|Paliperidone palmitate label'},
+    {l:'ED glucose',v:'412 mg/dL',cls:'warn',s:'2 Nov · possible lapse in diabetes care',prov:'ED lab via HIE|8 h ADT latency|'},
+    {l:'Housing (HRA)',v:'“stable”',cls:'muted',s:'Mar 2026 · 8 months old · contradicted twice',prov:'HRA Mar 2026 vs ADT address + returned mail|Stale|Recipe R8'}],
+  part2:true,
+  actions:[
+    {b:'Text Andre now; call after 14:00 with Jordan Ellis',s:'Two morning calls failed; his answer pattern is afternoons; texting allowed'},
+    {b:'Book the injection clinic and a ride',s:'Lakeside walk-in, Tue 10 or Thu 12 Nov · after 16 Nov a two-injection restart is needed'},
+    {b:'Re-screen housing; refer to housing navigator',s:'Motel address + returned mail contradict the 8-month-old HRA'},
+    {b:'Ask about consent for the SUD record',s:'A Part 2 record exists; content stays hidden until he consents'}],
+  aside:'Set aside: another morning call (2 failures already); a letter (mail came back).',
+  situation:[
+    ['expected','Expected','FUH 30-day follow-up, window open to 29 Nov'],
+    ['unknown','Unknown','Where he is sleeping tonight'],
+    ['expected','Expected','Injection given by 16 Nov, or restart']],
+  ifthen:'If he confirms a new address: update eligibility (write-back) and re-run the SDOH screen.',
+  ai:[{id:'reason',l:'Discharge plan from scanned PDF',d:'“LAI due 11/2; FUH appt 11/4 Lakeside”'}],
+  stars:['FUH (HEDIS, not Stars)'], recipes:['R3','R8','R9'], P:'P4'
+},
+rosa:{
+  key:'rosa', name:'Rosa Delgado', age:83, plan:'D-SNP', id:'LHP-D-38815', prog:'Complex CM, dementia, falls · full dual', color:'var(--amber)',
+  scenario:'Dementia, falls, caregiver strain', stresses:'Split identity, caregiver, language',
+  sevNote:'Second fall in 4 weeks on a new sedative',
+  headline:`Second fall <b>Friday 6 Nov</b> at Riverbend, filed under <b>“Delgado-Ruiz”</b>: her chart looked quiet`,
+  reason:{ai:'identity', text:'Identity link 0.94 · steward pending',prov:'MCheck identity (ADT-71108 ↔ ADT-77650)|Linked overnight|Suggested, not merged: a data steward confirms'},
+  contact:'Daughter Marisol <span class="mono">(614) 555-0187</span>, 15:30–17:00, Spanish · authorised rep until 30 Nov · landline 0 of 4',
+  tlTitle:'Patient summary: what changed since the 21 Oct call', tlNote:'claims show 1 fall; reality is 2',
+  timeline:[
+    {w:'18 Sep',x:'Zolpidem 5 mg started at an urgent care',k:'risk'},
+    {w:'12 Oct',x:'Fall #1, ED Northgate',k:'risk'},
+    {w:'21 Oct',x:'Note: “Hija Marisol dice que está agotada”',k:''},
+    {w:'27 Oct–2 Nov',x:'Landline: 0 of 4 answered (mornings)',k:''},
+    {w:'Fri 6 Nov',x:'Fall #2, ED Riverbend as “Delgado-Ruiz”',k:'risk'},
+    {w:'Today 11:00',x:'Bed + shower-chair decision due',k:'cur'}],
+  facts:[
+    {l:'Falls, last 30 days',v:'2',cls:'bad',s:'HRA said 0 · ADT says 2',prov:'ADT (two identities) vs HRA Nov 2025|ADT 10 h latency|Newest verified source wins'},
+    {l:'Beers-list sedative',v:'zolpidem',cls:'warn',s:'since 18 Sep · started weeks before the falls',prov:'PBM claims|Refilled 19 Oct|Recipe R15: drug-related falls'},
+    {l:'Authorisation (Marisol)',v:'30 Nov',cls:'warn',s:'expires in 21 days',prov:'Consent record|Event-based|Renewal bundled into today’s call'},
+    {l:'Care hours (LTSS)',v:'10 h/wk',cls:'muted',s:'unchanged 22 months · separate Medicaid ID',prov:'Medicaid LTSS extract|Monthly|Phase 2 integration'}],
+  identity:true,
+  medTitle:'Medicines: ED list vs pharmacy', medNote:'ED summary 6 Nov (filed under the other identity) · fills: PBM, live',
+  meds:[
+    {n:'zolpidem 5 mg',b:'—',p:'<b>Missing</b> from ED list',ph:'Started 18 Sep (urgent care), refilled 19 Oct',st:['conflict','Conflict'],note:'Beers list in dementia: medicine review to Dr. Ortega',prov:'PBM claims vs ED summary|Pharmacy live; ED summary 10 h late|Imperfection 25'},
+    {n:'donepezil',b:'daily',p:'Continued',ph:'Filled 14 Oct',st:['ok','Verified'],note:'',prov:'PBM|Fresh|'},
+    {n:'metformin',b:'twice daily',p:'Continued',ph:'Filled 14 Oct',st:['ok','Verified'],note:'',prov:'PBM|Fresh|'},
+    {n:'amlodipine',b:'daily',p:'Continued',ph:'Filled 14 Oct',st:['ok','Verified'],note:'',prov:'PBM|Fresh|'}],
+  actions:[
+    {b:'Morning: check the bed + shower-chair decision (11:00)',s:'The 15:35 call depends on it'},
+    {b:'Book a Spanish interpreter for 15:35',s:'Language blank in eligibility; Spanish in every note'},
+    {b:'15:35 call Marisol: post-fall check',s:'She sleeps after night shifts and leaves ~18:00'},
+    {b:'Zolpidem review to Dr. Ortega; book 7-day follow-up (13 Nov)',s:'Packet drafted · reply clock 48 h'},
+    {b:'Caregiver check-in, HRA, authorisation renewal',s:'Bundled: five clocks collide this week'}],
+  aside:'Set aside: the morning landline (0 of 4 answered); a letter (too slow for the FMC clock).',
+  situation:[
+    ['expected','Expected','Prior-auth decision: hospital bed + shower chair, due 11:00 today'],
+    ['expected','Expected','FMC follow-up visit by 13 Nov'],
+    ['confirm','Confirm','Caregiver strain cue from a half-Spanish note: your judgment']],
+  ifthen:'If the steward rejects the identity link: the 6 Nov fall is removed from her record and the call plan re-bundles.',
+  ai:[{id:'identity',l:'Identity link “Delgado-Ruiz”',d:'Same DOB, name variant, adjacent phone; match 0.94'},{id:'strain',l:'Caregiver-strain cue',d:'“está agotada” in the 21 Oct note'}],
+  stars:['FMC (1)','SNP care mgmt (1)','Medication review (1)'], recipes:['R5','R10','R11','R12','R15'], P:'P5'
+},
+gloria:{
+  key:'gloria', name:'Gloria Mensah', age:67, plan:'MA-PPO', id:'LHP-M-31877', prog:'Rising risk, diabetes + CKD 3a', color:'var(--grey)',
+  scenario:'Diabetic flagged “stopped refills”', stresses:'Right member, wrong problem',
+  sevNote:'No 72-hour clinical clock running',
+  headline:`Risk model flags <b>“non-adherent: metformin PDC 0.42”</b>. Four signals say she is paying cash elsewhere`,
+  reason:{text:'Flag downgraded to unknown',kind:'unknown',prov:'Workbench flag review|Overnight|Recipe R7: no claim is not the same as no medicine'},
+  contact:'Mobile <span class="mono">(614) 555-0178</span> · SMS opted in · best 16:00–16:30, text first · PCP Dr. P. Nair',
+  tlTitle:'Patient summary: why the flag points at the wrong problem', tlNote:'cash fills are invisible to claims',
+  timeline:[
+    {w:'28 Jun – 26 Aug',x:'Metformin ER filled monthly on plan card',k:''},
+    {w:'Sep onward',x:'No metformin claim (75 days)',k:''},
+    {w:'2 Oct',x:'Asks member services about a discount card at ValueRx',k:'cur'},
+    {w:'22 Oct',x:'Empagliflozin denied: “no metformin claim in 60 days”',k:'risk'},
+    {w:'Oct',x:'A1c 77 mmol/mol = 9.2% (was 7.4% in May)',k:'risk'}],
+  facts:[
+    {l:'A1c',v:'9.2%',cls:'bad',s:'77 mmol/mol (Oct, Summit) · 7.4% (May, Keystone)',prov:'Two labs, two units|Normalised|A naive trend reads “77 vs 7.4”'},
+    {l:'Metformin PDC (claims)',v:'0.42',cls:'muted',s:'claims-only · data artefact',prov:'Plan risk model|Run 1 Nov|Top factor = false positive'},
+    {l:'Appeal window',v:'26 Dec',cls:'warn',s:'Part D redetermination · 65 days from 22 Oct',prov:'Prior auth PA-87120|Real-time internal|CMS Part D appeals'},
+    {l:'Metformin cost on plan',v:'$0',s:'tier 1 at preferred pharmacies',prov:'Plan formulary|Plan year|A plan-card fill counts for her record'}],
+  flagLink:true,
+  actions:[
+    {b:'This week: text first, then call 16:00–16:30',s:'Don’t open with adherence. Confirm she buys metformin for cash at ValueRx'},
+    {b:'Dr. Nair appeals the empagliflozin denial',s:'With the cash-fill evidence · window closes 26 Dec'},
+    {b:'Suggest plan-card fills ($0 tier 1)',s:'Counts for her step-therapy record and the plan’s Part D adherence measure'},
+    {b:'Book a diabetes visit',s:'A1c rose from 7.4% to 9.2%'}],
+  aside:'Set aside: an adherence-coaching call (wrong problem); doing nothing (denial stands, A1c keeps rising).',
+  situation:[
+    ['unknown','Unknown','Where she fills metformin now (Phase 2 dispensed-history feed would show it)'],
+    ['conflict','Conflict','PA denial vs member-services note'],
+    ['expected','Expected','Appeal filed by 26 Dec']],
+  ifthen:'If she says she stopped metformin: restore the flag and switch to an adherence conversation.',
+  ai:[{id:'downgrade',l:'Flag downgraded to unknown',d:'Rule-based on 4 signals; reversible'}],
+  stars:['Blood sugar controlled (3)','Part D diabetes adherence (3)'], recipes:['R6','R7'], P:'P2'
+}};
+const MKEYS=['dwayne','walter','andre','rosa','gloria'];
+const PMAP={'P1':'walter','P2':'gloria','P3':'dwayne','P4':'andre','P5':'rosa'};
+
+/* =========================================================
+   Queue model (from annex "Queue (48)")
+   ========================================================= */
+const Q = ANNEX.queue.map(r=>{
+  const [rank,name,age,prog,trig,clock,due,hrs,U,risk,safety,I,fac,ver,alt,win,fails,A,score,nba,reason,lane]=r;
+  const pm=name.match(/^(P\d) (.*)$/); const key=pm?PMAP[pm[1]]:null;
+  return {rank,name:pm?pm[2]:name,key,age,prog:prog.replace(/^Complex CM - |^Rising risk - /,''),program:prog,trig,clock,due,hrs,U,risk,safety,I,fac,ver,alt,win,fails,A,score,nba,reason,lane};
+});
+const QX = { // hand-tuned "why now" and reach lines for the top of the queue (as on Screen 1)
+  'Walter Okafor':{sub:'78 · heart failure · discharged Sat',why:[['ok','New HF drug rejected at pharmacy'],['conflict','Stopped lisinopril shipped home'],['ok','K+ 5.1, above range']],clock:tag(),reach:'Home <span class="mono">(614) 555-0142</span><div class="sub">9–12, wife Grace answers</div>',next:'Call before noon, then prescriber'},
+  'Andre Willis':{sub:'41 · psychiatric discharge 30 Oct',why:[['ok','7-day follow-up missed'],['ok','Injection window closes today'],['confirm','Housing may have changed']],clock:tag('Overdue'),reach:'Text first, call after 14:00<div class="sub">2 morning voicemails full</div>',next:'With Jordan Ellis (BH co-manager)'},
+  'Lucia Ferreira':{sub:'76 · urosepsis · discharged Sun',why:[['ok','Antibiotic picked up']],reach:'Daughter <span class="mono">(614) 555-0121</span><div class="sub">verified 2 Nov</div>',next:'Confirm course and follow-up visit'},
+  'Ernesto Vega':{sub:'71 · pneumonia · discharged Fri',why:[['ok','Antibiotics picked up Fri']],reach:'Mobile <span class="mono">(614) 555-0133</span><div class="sub">answers mornings</div>',next:'Routine post-discharge call'},
+  'Isaac Hughes':{sub:'84 · frailty',why:[['expected','Monthly check-in due']]},
+  'Tomas Varga':{sub:'79 · diabetes + CKD',why:[['expected','Open task due']]}
+};
+function qx(q){
+  const x=QX[q.name]||{};
+  const why=x.why||(()=>{
+    const out=[]; if(q.trig&&q.trig!=='-') out.push(['ok',q.trig]);
+    out.push(['expected',q.clock]); if(q.ver!=='Y') out.push(['confirm',q.alt==='Y'?'No verified number':'No working number']);
+    return out;})();
+  const dp=q.due.split(' '); const clock=x.clock||chip('expected',`${dp[0]} ${dp[3]}`,`${q.clock}|Due ${q.due}|Expectation clock`);
+  const reach=x.reach||(q.ver==='Y'?'Mobile, verified':q.alt==='Y'?'Alternate number / SMS':'Letter + CHW / PCP office');
+  return {sub:x.sub||`${q.age} · ${q.prog.toLowerCase()}`,why,clock,reach,next:x.next||q.nba};
+}
+
+/* =========================================================
+   Render helpers
+   ========================================================= */
+const $main=document.getElementById('main');
+function render(keepScroll){
+  const y=window.scrollY;
+  document.querySelectorAll('.nav[data-go]').forEach(b=>b.setAttribute('aria-current',String(b.dataset.go===S.screen)));
+  const R={queue:rQueue,member:rMember,call:rCall,flag:rFlag,data:rData,impact:rImpact}[S.screen];
+  $main.innerHTML=R()+footer();
+  if(keepScroll) window.scrollTo(0,y);
+  tick(true);
+  if(S.tour) placeSpot();
+}
+function footer(){
+  return `<div class="foot"><span>MCheck® Handoff · working prototype for the HiLabs APM case 2026–27 · all members, numbers, providers and the plan are fictional (555-01xx).</span><span>Press <span class="kbd">Ctrl</span> <span class="kbd">K</span> to search · <span class="kbd">?</span> for shortcuts</span></div>`;
+}
+function go(screen,opts={}){
+  S.screen=screen; if(opts.member) S.member=opts.member;
+  if(screen==='call' && S.t<CALL0) S.t=toS('15:42');
+  render(); if(!opts.keep) window.scrollTo({top:0,behavior:'instant'});
+  $main.focus({preventScroll:true});
+}
+
+/* =========================================================
+   Screen 1: Queue
+   ========================================================= */
+function edTimer(){const d=Math.max(0,S.t-toS('07:12'));return `${Math.floor(d/3600)}:${String(Math.floor(d/60)%60).padStart(2,'0')}`}
+const CALL0=toS('15:35')+18;
+const callDur=()=>Math.max(0,(S.call.saved?S.call.endT:S.t)-CALL0);
+const docMin=()=>Math.max(1,Math.round(callDur()/60*0.6));
+const dwayneGone=()=>!S.dwayneDone && S.t>=toS('11:52');
+const dmeDecided=()=>S.t>=toS('10:42');
+function rQueue(){
+  const legend=`<div class="legend"><span class="lbl">Act on</span>${tag()}<span class="lbl">How sure</span>${chip('ok','Verified')}${chip('confirm','Confirm on call')}${chip('conflict','Conflict')}${chip('expected','Expected, not received')}${chip('unknown','Unknown')}</div>`;
+  return `<div class="page-h" data-tour="legend"><div><h1>Your Monday handoff</h1><p>Built overnight from 9 source systems (28 datasets); live updates from ADT, pharmacy and prior-auth events (last 07:15). Six discharges since Friday; ${S.dwayneDone||dwayneGone()?'no member is':'one member is'} reachable right now.</p></div>${legend}</div>
+  <div class="grid-main"><div class="stack">${nowCard()}${schedCard()}${rankedCard()}${weekCard()}</div>
+  <aside class="stack">${overnightCard()}${expectedCard()}${loadCard()}</aside></div>`;
+}
+function nowCard(){
+  if(S.dwayneDone) return `<section class="card" data-tour="now"><div class="card-b" style="padding:16px 20px"><div class="between"><div><span class="eyebrow" style="color:var(--green)">Handled at 08:04 · NOW lane cleared</span><h2 style="margin-top:4px">Dwayne Pruitt, 58 · reached through the ED</h2><p class="muted small" style="margin:4px 0 0">New number confirmed and text consent captured; controller inhaler before discharge; warm handoff to Eastfield FQHC, ride booked. Written back plan-wide.</p></div><button class="btn sm" data-member="dwayne">${ic('user',15)}Open handoff</button></div></div></section>`;
+  if(dwayneGone()) return `<section class="card" data-tour="now" style="border-left:4px solid var(--faint)"><div class="card-b" style="padding:16px 20px"><span class="eyebrow muted">Window closed · ED discharge (A03) 11:52</span><h2 style="margin-top:4px">Dwayne Pruitt left the ED before we reached him</h2><p class="muted small" style="margin:4px 0 10px">Plan switched automatically: text 555-0119 once consent exists, route to the Eastfield FQHC community health worker. This is why the NOW lane sits above the ranking.</p><button class="btn sm" data-jump="08:00">${ic('clock',15)}Replay from 08:00</button></div></section>`;
+  return `<section class="card now" data-tour="now"><div class="wash"></div>
+   <div class="now-top"><div style="min-width:0;flex:1 1 380px"><div class="row"><span class="eyebrow" style="color:var(--red)">Now · reachable</span>${tag()}</div>
+     <h2 style="font-size:21px;margin-top:6px">Dwayne Pruitt, 58 <span class="muted" style="font-weight:400;font-size:15px">COPD · D-SNP · 6 ED visits since June</span></h2>
+     <p style="margin:4px 0 0">Arrived at Riverbend General ED at <span class="mono">07:12</span>, short of breath. No discharge message yet, so he is still there.</p></div>
+     <div style="text-align:right"><div class="muted small">Window closes at ED discharge</div><div class="timer" data-live="edtimer">${edTimer()}</div><div class="small" style="color:var(--red)">in the ED so far</div></div></div>
+   <div style="padding:6px 22px 4px" class="row">${lchip('ok','In ED since 07:12 · ADT','ADT-78840 (A04)|07:13, 1 min latency|')}${lchip('ok','Number on file reassigned 21 Jul','FCC Reassigned Numbers Database + “wrong person” 20 Oct|Monthly|Suppressed automatically')}${lchip('confirm','New number in ED + pharmacy records','ADT PID today + pharmacy profile 31 Oct|Never dialled|Rank 1: two independent recent sources agree')}${lchip('ok','No controller inhaler since 2 Jul','PBM claims|Daily|130-day gap')}${lchip('ok','Assigned PCP left practice in Aug','MCheck Directory Accuracy|Continuous|Ghost listing')}</div>
+   <div style="display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:20px;padding:12px 22px 20px" class="nowgrid">
+     <table class="numtable" data-tour="numbers"><thead><tr><th>Number</th><th>Source</th><th>Status</th></tr></thead><tbody>
+       <tr><td class="mono">(614) 555-0119</td><td>ADT today + pharmacy 31 Oct</td><td>${chip('confirm','Rank 1 · 2 sources')}</td></tr>
+       <tr><td class="mono strike">(614) 555-0115</td><td>Eligibility (834)</td><td>${chip('suppressed','Suppressed: FCC + “wrong person”')}</td></tr>
+       <tr><td class="mono">(614) 555-0160</td><td>Shelter desk · case note Nov 2025</td><td>${chip('unknown','Rank 3 · 12 months old')}</td></tr></tbody></table>
+     <div><button class="btn primary" data-act="callDwayne" style="height:44px">${ic('phone',17)}Call Riverbend ED case manager <span class="mono">(614) 555-0131</span></button>
+       <p class="muted small" style="margin:10px 0 0">Ask: confirm the new number and text consent; his controller inhaler before he leaves; warm handoff to Eastfield FQHC, ride offered (D-SNP benefit).</p>
+       <p class="small" style="margin:10px 0 0"><button class="link" data-member="dwayne">Open full handoff ${ic('arrow',14)}</button></p></div></div></section>`;
+}
+function schedCard(){
+  const dep=dmeDecided()?chip('ok','Bed + shower chair approved 10:42','Prior auth (medical, 72 h clock)|Decision 10:42|Dependency met'):chip('expected','Bed + shower-chair decision due 11:00','Prior auth (CMS-0057-F 72 h clock)|Due 11:00 today|The 15:35 call depends on it');
+  return `<section class="card sched" data-tour="sched"><div><div class="eyebrow" style="color:var(--blue-ink)">Scheduled today</div><div class="bigtime">15:35</div></div>
+   <div><div><b>Rosa Delgado, 83</b> · call to daughter Marisol in Spanish (interpreter booked) · 5 open items bundled</div>
+   <div class="row small" style="margin-top:6px"><span class="muted">Before then:</span>${dep}${lchip('ok','2nd fall in 4 weeks')}${lchip('confirm','Found under a second name')}</div></div>
+   <div class="row"><button class="btn" data-member="rosa">Handoff</button><button class="btn primary" data-act="openCall">Open call plan</button></div></section>`;
+}
+function rankedRows(){
+  let rows=Q.filter(q=>q.lane==='Ranked');
+  const f=S.qfilter;
+  if(f==='disch') rows=rows.filter(q=>/Discharg/.test(q.trig));
+  if(f==='unreach') rows=rows.filter(q=>q.ver!=='Y');
+  if(f==='safety') rows=rows.filter(q=>q.safety>0);
+  if(S.qsearch) rows=rows.filter(q=>(q.name+' '+q.program+' '+q.trig).toLowerCase().includes(S.qsearch.toLowerCase()));
+  return rows;
+}
+function rankedCard(){
+  const all=rankedRows(); const rows=(S.showAll||S.qsearch||S.qfilter!=='all')?all:all.slice(0,6);
+  const anyOpen=Object.values(S.whyOpen).some(Boolean);
+  const tr=rows.map((q,i)=>{
+    const x=qx(q); const open=S.whyOpen[q.name];
+    const scoreBar=`<div class="scorebar"><div class="track"><div class="fill" style="width:${q.score}%"></div></div><b>${q.score}</b></div>`;
+    return `<tr class="qrow ${q.key?'annex':''}" data-row="${esc(q.name)}" tabindex="0" ${i===0?'data-tour="row1"':''}>
+      <td class="mono muted" style="width:34px">${esc(q.rank)}</td>
+      <td><div class="nm">${esc(q.name)}</div><div class="sub">${esc(x.sub)}</div></td>
+      <td><div class="whychips">${x.why.map(([k,t])=>lchip(k,esc(t))).join('')}</div></td>
+      <td class="hide-m">${x.clock}</td>
+      <td class="hide-m">${x.reach}</td>
+      <td>${esc(x.next)}</td>
+      <td style="width:128px">${scoreBar}<div style="text-align:right;margin-top:4px"><button class="link small" data-why="${esc(q.name)}">${open?'Hide why':'Why'} ${ic('chev',12)}</button></div></td></tr>
+      ${open?whyRow(q):''}`;
+  }).join('');
+  return `<section class="card" data-tour="ranked"><div class="card-h"><div><h2>Ranked by what can’t wait</h2><p>Score = how soon a clinical clock runs out × how serious × whether you can act today</p></div>
+    <div class="row"><div class="search">${ic('search',15)}<input id="qsearch" placeholder="Filter caseload" value="${esc(S.qsearch)}" aria-label="Filter caseload"></div><button class="btn sm" data-act="whyAll" data-tour="whybtn">${anyOpen?'Hide reasons':'Why this order'}</button></div></div>
+    <div style="padding:0 20px 10px" class="tabs" role="group" aria-label="Queue filter">${[['all','All ranked ('+Q.filter(q=>q.lane==='Ranked').length+')'],['disch','Discharges'],['safety','Safety flag'],['unreach','No verified number']].map(([k,l])=>`<button data-qf="${k}" aria-pressed="${S.qfilter===k}">${l}</button>`).join('')}</div>
+    <div style="overflow-x:auto"><table class="qtable"><thead><tr><th></th><th>Member</th><th>Why now</th><th class="hide-m">Clock</th><th class="hide-m">Best way to reach</th><th>Next step</th><th style="text-align:right">Score</th></tr></thead><tbody>${tr||`<tr><td colspan="7" class="muted" style="padding:20px">No members match.</td></tr>`}</tbody></table></div>
+    <div style="padding:12px 20px" class="small muted">${(!S.showAll&&S.qfilter==='all'&&!S.qsearch)?`${all.length-6} more ranked below, incl. two more discharges (Whitfield, Bennett). This week, no clock today: Gloria Mensah (flag downgraded) · <button class="link" data-act="showAll">Show all</button>`:`Showing ${rows.length} · <button class="link" data-act="showLess">Show top 6</button>`}</div></section>`;
+}
+function whyRow(q){
+  const Areason=q.fac==='Y'?'In a facility now = 1':`${q.ver==='Y'?'verified number 0.9':q.alt==='Y'?'alternate channel 0.6':'no number 0.3'}${q.win!=='Y'?' × 0.6 outside window':''}${q.fails>=2?' × 0.7 after '+q.fails+' failed':''}${q.risk>=0.5&&q.A===0.5?' → equity floor 0.5':''}`;
+  return `<tr class="why"><td colspan="7"><div class="whybox">
+   <div class="f"><div class="l">Urgency U · nearest clock</div><div class="k">${q.U}</div><div class="small">${esc(q.clock)} · ${q.hrs<0?Math.abs(q.hrs)+' h overdue':q.hrs+' h left'}</div></div>
+   <div class="f"><div class="l">Impact I · 1 + risk×4 + safety (≤5)</div><div class="k">${q.I}</div><div class="small">risk ${q.risk} · ${q.safety} safety flag${q.safety===1?'':'s'}</div></div>
+   <div class="f"><div class="l">Actionability A · can you act today?</div><div class="k">${q.A}</div><div class="small">${esc(Areason)}</div></div>
+   <div class="f" style="background:var(--tint);border-color:transparent"><div class="l">Score = 100 × U × I/5 × A</div><div class="k">${q.score}</div><div class="small">${esc(q.reason)}</div></div></div></td></tr>`;
+}
+function weekCard(){
+  const g=Q.find(q=>q.key==='gloria');
+  const done=S.flag==='accepted', kept=S.flag==='kept';
+  return `<section class="card thisweek" data-tour="week"><div><div class="eyebrow muted">This week · no clock today</div>
+   <div style="margin-top:4px"><b>Gloria Mensah, 67</b> · diabetes + CKD 3a · ${done?chip('unknown','Flag downgraded · 3 tasks added'):kept?chip('confirm','Flag kept by Maria'):chip('unknown','Downgraded: cash fills likely')} <span class="mono muted small">score ${g.score}</span></div>
+   ${S.tasks.length?`<ul class="small" style="margin:8px 0 0;padding-left:18px">${S.tasks.map(t=>`<li>${esc(t)}</li>`).join('')}</ul>`:''}</div>
+   <button class="btn" data-go="flag">Review flag</button></section>`;
+}
+function overnightCard(){
+  return `<section class="card" data-tour="overnight"><div class="card-h"><div><h2>Done overnight</h2><p>Automated. Nothing here changes a care plan.</p></div></div><div class="card-b">
+   <div class="done-item">${chip('done','Done')}Matched 21 hospital alerts to 6 discharges and 1 ED arrival; 2 duplicates removed</div>
+   <div class="done-item">${chip('confirm','Confirm')}Read discharge medicines from 2 UM review notes <button class="link small" data-member="walter">review</button></div>
+   <div class="done-item">${chip('confirm','Confirm')}Linked an ED record filed as <i>Rosa Delgado-Ruiz</i> <button class="link small" data-member="rosa">review</button></div>
+   <div class="done-item">${chip('done','Done')}Suppressed 1 reassigned number (FCC database + a “wrong person” call)</div>
+   <div class="done-item">${chip('unknown','Downgraded')}Gloria Mensah’s “non-adherent” flag: cash fills likely <button class="link small" data-go="flag">review</button></div></div></section>`;
+}
+function expectedCard(){
+  return `<section class="card" data-tour="expected"><div class="card-h"><div><h2>Expected, not received</h2><p>Absence is data: the screen is never silent.</p></div></div><div class="card-b sit">
+   <div><b>Walter Okafor</b> · discharge summary<br>${chip('expected','Due tonight 23:59')} <span class="mono faint xs">TRC rule</span></div>
+   <div><b>Walter Okafor</b> · cardiology visit within 7 days<br>${chip('unknown','Not visible: ask on call')}</div>
+   <div><b>Andre Willis</b> · injection<br>${chip('expected','Window closes today; restart after 16 Nov')}</div>
+   <div><b>Rosa Delgado</b> · bed + shower-chair decision<br>${dmeDecided()?chip('ok','Received 10:42 · approved'):chip('expected','Due 11:00 today')}</div></div></section>`;
+}
+function loadPlan(){
+  const wed=Q.filter(q=>q.due.startsWith('Wed')), thu=Q.filter(q=>q.due.startsWith('Thu'));
+  const byScore=[...wed].sort((a,b)=>b.score-a.score);
+  const pulled=byScore.slice(0,5);
+  const rest=byScore.slice(5).sort((a,b)=>a.risk-b.risk);
+  const floatW=rest[0], floatT=[...thu].sort((a,b)=>a.risk-b.risk)[0];
+  return {pulled,floatW,floatT,wed:wed.length,thu:thu.length};
+}
+function loadCard(){
+  const base=[3,4,12,7,6], days=['Mon','Tue','Wed','Thu','Fri'], cap=6, max=12;
+  const after=[6,6,6,6,6];
+  const segs=S.rebalanced?[[3,3,0],[4,2,0],[6,0,0],[6,0,0],[6,0,0]]:base.map(v=>[v,0,0]);
+  if(S.rebalanced){segs[2][2]=0;}
+  const H=110;
+  const bars=days.map((d,i)=>{
+    const v=S.rebalanced?after[i]:base[i]; const over=!S.rebalanced&&v>cap;
+    const [own,pull]=segs[i];
+    return `<div class="bar"><span class="v" style="color:${over?'var(--red)':'var(--head)'}">${v}</span><div class="stackb" style="height:${v/max*H}px">
+      <div class="seg" style="height:${own/v*100}%;background:${over?'var(--redfill)':'#4A62A8'}"></div>${pull?`<div class="seg" style="height:${pull/v*100}%;background:repeating-linear-gradient(45deg,var(--blue) 0 4px,#8FB0FF 4px 8px)"></div>`:''}</div><span class="d">${d}</span></div>`;
+  }).join('');
+  const lp=loadPlan();
+  const msg=S.rebalanced
+   ?`<div class="callout green small"><b>Approved by supervisor ${S.rebalanced}.</b> Pulled forward to Mon–Tue: ${lp.pulled.map(q=>esc(q.name)).join(', ')}. To the float nurse (OH licence ✓, language ✓): ${esc(lp.floatW.name)} (Wed), ${esc(lp.floatT.name)} (Thu).</div>`
+   :`<div class="callout red small"><b>Wed spike: 12 clocks vs 6.</b> Pull 5 routine calls into Mon–Tue spare slots; move 2 low-complexity calls (Wed, Thu) to the float nurse, licensed in OH.</div>`;
+  return `<section class="card" data-tour="load"><div class="card-h"><div><h2>This week’s clock load</h2></div><span class="mono faint small">capacity ${cap}/day</span></div>
+   <div class="card-b"><div class="bars" role="img" aria-label="Clock load: ${days.map((d,i)=>d+' '+(S.rebalanced?after[i]:base[i])).join(', ')}"><div class="cap" style="bottom:${cap/max*H+22}px"><span>${cap}</span></div>${bars}</div>
+   <div style="margin-top:12px">${msg}</div>
+   <div class="row" style="margin-top:12px">${S.rebalanced?`<button class="btn sm" data-act="undoLoad">Undo</button>`:`<button class="btn sm primary" data-act="rebalance">Send to supervisor</button><button class="btn sm" data-act="loadDetail">Adjust</button>`}</div></div></section>`;
+}
+
+/* =========================================================
+   Screen 2: Member handoff (I-PASS)
+   ========================================================= */
+function memberTabs(){
+  return `<div class="mtabs" role="group" aria-label="Members">${MKEYS.map(k=>{const m=M[k];return `<button class="mtab" data-member="${k}" aria-pressed="${S.member===k}"><i class="dot" style="background:${m.color}"></i><div><b>${m.name}, ${m.age}</b><span>${m.scenario}</span></div></button>`}).join('')}
+   <button class="mtab" data-act="palette"><div><b>${ic('search',14)} Any of 48</b><span>search caseload</span></div></button></div>`;
+}
+function aiChip(m,id,label){
+  const ok=S.aiConfirmed[m.key+':'+id];
+  return ok?chip('ok',`${label} · confirmed ${ok}`):`<button class="chip confirm" data-ai="${m.key}:${id}" title="Click to confirm">${ic('bang',14)}${label} · confirm</button>`;
+}
+function rMember(){
+  const m=M[S.member]; if(!m) return rGeneric();
+  const sev=S.severity[m.key];
+  const reasonChip=m.reason.ai?aiChip(m,m.reason.ai,m.reason.text):chip(m.reason.kind||'ok',m.reason.text,m.reason.prov);
+  const pending=m.ai.filter(a=>!S.aiConfirmed[m.key+':'+a.id]);
+  const confirmed=S.handoffConfirmed[m.key];
+  return `${memberTabs()}
+  <section class="card mhead" data-tour="mhead"><div style="min-width:0"><h1>${m.name}, ${m.age} <small>${m.plan} · <span class="mono">${m.id}</span> · ${m.prog}</small></h1>
+    <p style="margin:8px 0 4px;font-size:15px">${m.headline} <span data-tour="reason">${reasonChip}</span></p>
+    <p class="muted small" style="margin:0">${m.contact}</p>
+    <div class="row" style="margin-top:10px">${m.stars.map(s=>`<span class="chip star">${s}</span>`).join('')}<span class="xs faint">Stars / HEDIS measure (2027 weight)</span></div></div>
+   <div class="sev" data-tour="severity"><span class="muted small">Illness severity · <b>Maria only</b></span><div class="sevsel" role="group" aria-label="Illness severity">${['Stable','Watcher','Unstable'].map(v=>`<button data-sev="${v}" data-v="${v}" aria-pressed="${sev===v}">${v}</button>`).join('')}</div><span class="muted small" style="max-width:280px">${m.sevNote}</span></div></section>
+  <div class="grid-main" style="margin-top:18px"><div class="stack">
+   <section class="card" data-tour="timeline"><div class="card-h"><h2>${m.tlTitle}</h2><span class="mono faint xs" style="text-align:right">${m.tlNote}</span></div><div class="card-b"><div class="timeline">${m.timeline.map(e=>`<div class="tl ${e.k}"><i class="node"></i><span class="when">${e.w}</span><div class="what">${e.x}</div></div>`).join('')}</div></div></section>
+   <section class="card" data-tour="facts"><div class="facts">${m.facts.map(f=>`<div class="fact" data-prov="${esc(f.prov)}" tabindex="0"><div class="l">${f.l}</div><div class="v mono ${f.cls||''}">${f.v}</div><div class="s">${f.s}</div></div>`).join('')}</div></section>
+   ${m.flagLink?`<section class="card"><div class="card-b" style="padding:18px 20px"><div class="between"><div><h2>Right member, wrong problem</h2><p class="muted small" style="margin:4px 0 0">The risk model’s flag rests on claims only. Review the four signals before anyone coaches “adherence”.</p></div><button class="btn primary" data-go="flag">Open flag review</button></div></div></section>`:''}
+   ${m.meds?medsCard(m):''}
+   ${m.numbers?numbersCard():''}
+   ${m.identity?identityCard():''}
+   ${m.part2?part2Card():''}
+   ${rawCard(m)}
+  </div><aside class="stack">
+   <section class="card" data-tour="actions"><div class="card-h"><h2>Action list</h2><span class="xs faint mono">AI-ordered · you decide</span></div><div class="card-b"><ol class="actions">${m.actions.map((a,i)=>{const d=S.actionsDone[m.key+':'+i];return `<li class="${d?'done':''}"><button class="pin ${i>1&&!d?'o':''}" data-done="${m.key}:${i}" aria-label="Mark step ${i+1} done">${d?ic('check',13):i+1}</button><div><b>${a.b}</b><span>${a.s}</span></div></li>`}).join('')}</ol><div class="hr"></div><p class="muted small" style="margin:0">${m.aside}</p></div></section>
+   <section class="card" data-tour="situation"><div class="card-h"><h2>Situation awareness</h2></div><div class="card-b sit">${m.situation.map(([k,l,t])=>`<div>${chip(k,l)} ${t}</div>`).join('')}<div class="callout red" style="margin-top:4px"><b>If-then:</b> ${m.ifthen}</div></div></section>
+   <section class="card"><div class="card-h"><h2>Recipes that fired</h2></div><div class="card-b row">${m.recipes.map(r=>`<button class="chip line" data-recipe="${r}">${ic('link',13)}${r} · ${esc(recipeName(r))}</button>`).join('')}</div></section>
+  </aside></div>
+  <div class="sticky" data-tour="sticky"><b>Synthesis by receiver</b>
+   <div class="aifacts">${confirmed?chip('ok',`Handoff confirmed ${confirmed} · written back`):pending.length?`<span class="muted small">${pending.length} AI-read fact${pending.length>1?'s':''} to confirm:</span>`+pending.map(a=>`<button class="chip confirm" data-ai="${m.key}:${a.id}" title="${esc(a.d)}">${ic('bang',14)}${a.l}</button>`).join(''):chip('ok','All AI-read facts confirmed')}</div>
+   <span class="mono faint xs">sticky · always above the fold</span>
+   <button class="btn primary" data-act="confirmHandoff" ${confirmed?'disabled':''}>${confirmed?'Confirmed':'Confirm handoff'}</button></div>`;
+}
+function medsCard(m){
+  return `<section class="card" data-tour="meds"><div class="card-h"><h2>${m.medTitle}</h2><span class="mono faint xs">${m.medNote}</span></div>
+   <div style="overflow-x:auto"><table class="medtable"><thead><tr><th>Medicine</th><th>Before admission</th><th>Discharge plan</th><th>Pharmacy since discharge</th><th>Status</th><th></th></tr></thead><tbody>
+   ${m.meds.map(d=>`<tr><td><b style="font-weight:500">${d.n}</b></td><td>${d.b}</td><td>${d.p}</td><td>${d.ph}</td><td>${d.st[0]==='act'?`<span data-prov="${esc(d.prov)}" tabindex="0">${tag(d.st[1])}</span>`:chip(d.st[0],d.st[1],d.prov)}</td><td class="note">${d.note}</td></tr>`).join('')}</tbody></table></div></section>`;
+}
+function numbersCard(){
+  return `<section class="card"><div class="card-h"><h2>Contact points, all sources</h2><span class="mono faint xs">ranked by recency × past success · FCC check</span></div><div style="overflow-x:auto"><table class="medtable"><thead><tr><th>Number</th><th>Belongs to</th><th>Source</th><th>Last outcome</th><th>Status</th></tr></thead><tbody>
+   <tr><td class="mono">(614) 555-0119</td><td>Dwayne (likely)</td><td>ADT PID 29 Oct + today; pharmacy 31 Oct</td><td>Never tried</td><td>${S.dwayneDone?chip('ok','Verified 08:04 · written back'):chip('confirm','Rank 1')}</td></tr>
+   <tr><td class="mono strike">(614) 555-0115</td><td>Not Dwayne any more</td><td>Eligibility 834</td><td>“Wrong person” 20 Oct</td><td>${chip('suppressed','Suppressed')}</td></tr>
+   <tr><td class="mono">(614) 555-0160</td><td>Harbor Light shelter desk</td><td>Case note Nov 2025</td><td>Left message Nov 2025</td><td>${chip('unknown','Rank 3')}</td></tr>
+   <tr><td class="mono">(614) 555-0131</td><td>Riverbend ED case manager</td><td>MCheck Directory Accuracy</td><td>—</td><td>${chip('ok','Verified')}</td></tr></tbody></table></div>
+   ${S.dwayneDone?'':`<div style="padding:12px 20px 16px"><button class="btn primary" data-act="callDwayne">${ic('phone',16)}Call the ED case manager</button></div>`}</section>`;
+}
+function identityCard(){
+  const r=[['Name in message','DELGADO^ROSA^M','DELGADO-RUIZ^ROSA',1],['Facility MRN','NG-118822','RB-552019',1],['Phone in PID','(614) 555-0186','(614) 555-0187',1],['Address in PID','2210 Alder Way','2210 ALDER WY',1],['Plan member ID','LHP-D-38815','LHP-D-38815',0],['Latency to plan','0.2 h','10.3 h',1]];
+  const linked=S.aiConfirmed['rosa:identity'];
+  return `<section class="card"><div class="card-h"><div><h2>Raw records: why Rosa’s second fall looks like a stranger’s</h2><p>Plan IDs are unique; the split sits upstream in hospital ADT/HIE records. MCheck identity links them; a data steward confirms.</p></div>${linked?chip('ok','Link confirmed '+linked):aiChip(M.rosa,'identity','Link 0.94')}</div>
+   <div class="card-b" style="overflow-x:auto"><table class="rawtable"><thead><tr><th>ADT field</th><th>ADT-71108 · 12 Oct · Northgate</th><th>ADT-77650 · 6 Nov · Riverbend</th></tr></thead><tbody>${r.map(([a,b,c,bad])=>`<tr><td style="font-family:var(--sans)">${a}</td><td>${b}</td><td class="${bad?'bad':'good'}">${c}</td></tr>`).join('')}</tbody></table></div></section>`;
+}
+function part2Card(){
+  return `<section class="card"><div class="card-h"><h2>Behavioural-health records</h2><span class="mono faint xs">consent-gated · 42 CFR Part 2</span></div><div class="card-b sit">
+   <div>${chip('ok','Verified')} FUH appointment 4 Nov · <b>no-show</b> · BH vendor feed (no claim is ever created for a no-show)</div>
+   <div>${chip('ok','Verified')} Last injection 5 Oct (J2426) · monthly time point ±7 days</div>
+   <div class="callout" style="background:var(--greyt);display:flex;gap:10px;align-items:flex-start">${ic('lock',18)}<div><b>Substance-use record exists. Content hidden.</b><br><span class="small muted">Part 2 consent is not on file. The workbench shows that the record exists so Maria can ask; it never shows what it says.</span></div></div></div></section>`;
+}
+function rawCard(m){
+  const rows=ANNEX.imperf.filter(r=>r[1]===m.P);
+  return `<section class="card"><details class="details" style="border-top:0"><summary><span>Planted data problems in this record (${rows.length}) and how the screen handles them</span><span class="chev">${ic('chev',16)}</span></summary><div style="padding:0 20px 14px">${rows.map(r=>`<div class="imp"><span class="n">${r[0]}</span><div><b>${esc(r[2])}: ${esc(r[3])}</b><div class="muted">A naive tool: ${esc(r[4])}</div><div>Handoff: ${esc(r[5])}</div></div></div>`).join('')}</div></details></section>`;
+}
+function rGeneric(){
+  const q=Q.find(x=>x.name===S.member); if(!q) {S.member='walter';return rMember();}
+  const x=qx(q);
+  return `${memberTabs()}<section class="card mhead"><div><h1>${esc(q.name)}, ${q.age} <small>${esc(q.program)}</small></h1><p class="muted" style="margin:8px 0 0">Background caseload member (annex “Queue (48)”). The five annex members carry the full synthetic record; this one shows how the queue explains its rank.</p></div></section>
+  <div class="grid-main" style="margin-top:18px"><div class="stack"><section class="card"><div class="card-h"><h2>Why this rank</h2></div><table class="qtable"><tbody>${whyRow(q)}</tbody></table></section>
+  <section class="card"><div class="card-h"><h2>Signals</h2></div><div class="card-b row">${x.why.map(([k,t])=>chip(k,esc(t))).join('')} ${chip('ok','Risk '+q.risk+' · model run 1 Nov')}</div></section></div>
+  <aside class="stack"><section class="card"><div class="card-h"><h2>Next best action</h2></div><div class="card-b"><p style="margin:0 0 6px"><b>${esc(q.nba)}</b></p><p class="muted small" style="margin:0">Best way to reach: ${x.reach}</p></div></section></aside></div>`;
+}
+const recipeName = id => (ANNEX.recipes.find(r=>r[0]===id)||[])[1]||'';
+
+/* =========================================================
+   Screen 3: Call & confirm (Rosa, 15:42)
+   ========================================================= */
+const A_ANS={1:'Rosa Delgado',2:'83',3:'Complex CM · dementia, falls',4:'Spanish',5:'Yes · Spanish interpreter',6:'Marisol (614) 555-0187, 15:30–17:00',7:'Marisol Delgado (daughter)',8:'Marisol · until 30 Nov 2026',9:'Daughter Marisol',10:'Works nights',12:'2 (12 Oct, 6 Nov)',13:'6 Nov, Riverbend · fall',14:'None',15:'2 (12 Oct, 6 Nov)',16:'Scalp contusion, CT head negative',17:'Dementia · type 2 diabetes · hypertension · CKD 3a',18:'donepezil, metformin, amlodipine, zolpidem 5 mg',19:'ED list omits zolpidem',20:'zolpidem 5 mg since 18 Sep',21:'zolpidem, 18 Sep',22:'Urgent care',23:'Dr. Ortega (614) 555-0157',24:'11 Aug',25:'Bathing, dressing',26:'Dementia',29:'Hospital bed + shower chair',31:'Housed with daughter; food secure',33:'Rides benefit available',34:'10 h/week',35:'Bathroom devices, rides',38:'13 Nov'};
+const A_CUE={11:'Cue in 21 Oct note: “está agotada”',27:'Note cue: “se levanta confundida de noche”',30:'ED 6 Nov: scalp contusion',32:'zolpidem flagged (Beers)'};
+const A_J={11:{type:'select',opts:['0 – coping','1','2','3','4 – overwhelmed']},27:{type:'select',opts:['None','Some nights','Most nights']},28:{type:'text',ph:'rails, rugs, lighting'},30:{type:'select',opts:['None','Mild','Moderate','Severe']},32:{type:'text',ph:'for Dr. Ortega'},36:{type:'text',ph:'in their words'},37:{type:'select',opts:['Ready now','Thinking about it','Not now']},39:{type:'select',opts:['Low','Medium','High']},40:{type:'text',ph:'night-time care hours?'}};
+const A_SAMPLE={11:'3',27:'Most nights',28:'No grab rails in bathroom; loose rug in hall',30:'Mild',32:'Zolpidem since Sep: falls started weeks later',36:'“Que mi mamá no se caiga otra vez” — no more falls',37:'Ready now',39:'High',40:'More night-time care hours (Medicaid)'};
+function stateOf(s){ if(/Verified/.test(s))return['ok','Verified']; if(/Conflict/.test(s))return['corrected','Corrected']; if(/Confirm/.test(s))return['confirm','Confirm']; if(/Derived/.test(s))return['derived','Derived']; return['judg','Your judgment'];}
+function rCall(){
+  const c=S.call; const dur=callDur();
+  const F=ANNEX.assess; const pre=F.filter(f=>f[6]!=='Y'); const jf=F.filter(f=>f[6]==='Y');
+  const jDone=jf.filter(f=>(c.j[f[0]]||'').trim()).length; const rDone=pre.filter(f=>c.read[f[0]]).length;
+  const filter=c.filter||'need';
+  let rows=filter==='need'?jf:filter==='pre'?pre:F;
+  let lastSec=''; const body=rows.map(f=>{
+    const [n,sec,q,src,rule,st,j]=f; const [k,l]=stateOf(st);
+    const head=(filter==='all'&&sec!==lastSec)?`<tr class="sec"><td colspan="5">${esc(sec)}</td></tr>`:''; lastSec=sec;
+    let ans; if(j==='Y'){const spec=A_J[n]; const v=c.j[n]||'';
+      ans=spec.type==='select'?`<select class="jin ${v?'filled':''}" data-j="${n}" aria-label="${esc(q)}"><option value="">—</option>${spec.opts.map(o=>`<option ${o===v?'selected':''}>${o}</option>`).join('')}</select>`:`<input class="jin ${v?'filled':''}" data-j="${n}" value="${esc(v)}" placeholder="${spec.ph}" aria-label="${esc(q)}">`;}
+    else ans=esc(n===29&&dmeDecided()?'Bed + shower chair approved 10:42':A_ANS[n]||'');
+    const stc=j==='Y'?chip('judg','Your judgment'):chip(k,l,`${src}|${rule}|${st}`);
+    return `${head}<tr><td><div class="q">${esc(q)}</div>${A_CUE[n]?`<div class="cue">${esc(A_CUE[n])}</div>`:''}</td><td>${ans}</td><td>${stc}</td><td class="src">${esc(src)}</td><td>${j==='Y'?'':`<button class="rcheck" data-read="${n}" aria-pressed="${!!c.read[n]}" title="Read out to Marisol and confirmed">${ic('check',14)}</button>`}</td></tr>`;}).join('');
+  const v=k=>c.j[k]?`<span class="fill">${esc(c.j[k])}</span>`:`<span class="br">[__]</span>`;
+  const items=[
+    ['Post-fall check','ED Fri evening for a fall; CT head negative; Na 131',chip('expected','Follow-up visit due 13 Nov')+`<div style="margin-top:6px">${lchip('ok','D-SNP benefits offered: bathroom devices, rides')}</div>`],
+    ['Book follow-up with Dr. Ortega','Spanish-speaking, verified number (614) 555-0157',chip('ok','Thu 12 Nov 10:20 offered')],
+    ['Medicine review','zolpidem started at an urgent care, 3 weeks before the first fall',chip('confirm','Packet to Dr. Ortega drafted · reply 48 h')],
+    ['Caregiver check-in','Your judgment. She works nights; Rosa wakes confused at night',chip('expected',c.j[11]?'Screen done: '+esc(c.j[11]):'Screen in progress')],
+    ['Annual HRA + authorisation','HRA due 20 Nov; Marisol’s authorisation ends 30 Nov',chip('ok','31 of 40 fields pre-filled')]];
+  const allJ=jDone===jf.length;
+  return `<section class="card callhead" data-tour="callhead"><div><div class="muted small">${c.saved?'Call ended':'In call'}</div><div class="incall" data-live="calltimer">${fmtDur(dur)}</div></div>
+   <div style="min-width:0"><div><b style="font-size:19px;color:var(--head)">Rosa Delgado, 83</b> <span class="muted">D-SNP · dementia, falls · <span class="mono">LHP-D-38815</span></span></div>
+   <div style="margin-top:4px">Speaking with <b>Marisol Delgado</b>, daughter and authorised rep, <span class="mono">(614) 555-0187</span>, with a Spanish interpreter ${chip('confirm','Authorisation ends 30 Nov')}</div>
+   <div class="muted small" style="margin-top:4px">${ic('msg',13)} Texted 15:30 from “Lakeshore Health Plan” (consent on file) · branded caller ID · safe to talk: yes</div></div>
+   <div class="muted small" style="text-align:right;max-width:300px" data-tour="whowhen">Chosen because she answered 3 of 3 calls at 15:30–17:00, between her sleep and her night shift. Home landline: 0 of 4 answered in the morning.</div></section>
+  <div class="call-grid" style="margin-top:18px">
+   <section class="card" data-tour="items"><div class="card-h"><div><h2>One call, five open items</h2><p>Bundled because their clocks collide this week</p></div></div><div class="card-b"><div class="items">${items.map(([b,p,x],i)=>`<label class="item"><input type="checkbox" data-item="${i}" ${c.items[i]?'checked':''}><div><b>${b}</b><p>${p}</p>${x}</div></label>`).join('')}</div>
+    <div class="callout green small" style="margin-top:10px"><b>Update for Marisol:</b> bed and shower chair ${dmeDecided()?'approved today 10:42':'decision due 11:00'}. Delivery window to be confirmed.</div></div></section>
+   <section class="card" data-tour="assess"><div class="card-h"><h2>Annual assessment</h2><span class="mono muted small">31 of 40 pre-filled · ${jf.length-jDone} need you</span></div>
+    <div style="padding:0 20px 10px" class="between"><div class="tabs" role="group" aria-label="Assessment filter">${[['need','Needs you ('+jf.length+')'],['pre','Pre-filled (31)'],['all','All 40']].map(([k,l])=>`<button data-af="${k}" aria-pressed="${filter===k}">${l}</button>`).join('')}</div>
+     <div class="row small"><span class="muted">read out ${rDone}/31</span><button class="link small" data-act="readAll">Confirm all read out</button>·<button class="link small" data-act="sample">Fill sample answers</button></div></div>
+    <div style="padding:0 20px 8px"><div class="progress" title="${jDone+rDone} of 40 complete"><i style="width:${(jDone+rDone)/40*100}%"></i></div></div>
+    <div style="overflow-x:auto"><table class="atable"><thead><tr><th>Question</th><th>Answer</th><th>Status</th><th>Source</th><th></th></tr></thead><tbody>${body}</tbody></table></div>
+    <p class="muted small" style="padding:10px 20px 14px;margin:0">Pre-filled answers are read out to Marisol and confirmed, not assumed. Judgment fields stay blank by design.</p></section>
+   <div class="stack">
+    <section class="card" data-tour="note"><div class="card-h"><h2>Note draft</h2>${chip('confirm','AI draft · edit before saving')}</div><div class="card-b"><div class="notedraft">Called daughter/authorised rep Marisol (Spanish interpreter) re ED visit 6 Nov for fall, 2nd fall since 12 Oct. Reports pain: ${v(30)}. Night-time confusion: ${v(27)}. Follow-up booked with Dr. Ortega Thu 12 Nov 10:20. zolpidem (started 18 Sep, urgent care) sent to Dr. Ortega for review. Caregiver screen: score ${v(11)}. Bed/shower chair ${dmeDecided()?'approved 9 Nov':'pending'}; bathroom-safety devices ordered.<span class="srcl">Every sentence links to its source. Brackets wait for you.</span></div></div></section>
+    <section class="card" data-tour="writeback"><div class="card-h"><h2>When you confirm, these update everywhere</h2></div><div class="card-b wb">
+     ${[['Language: Spanish, interpreter needed'],['Best contact: Marisol, 15:30–17:00'],['Falls in past year: 2'],['Authorisation renewal form, sent by SMS']].map(([t])=>`<div>${chip('writeback',c.saved?'Written':'Write-back')}<span>${t}</span></div>`).join('')}
+     <div>${chip('steward','To data steward')}<span>Link “Rosa Delgado-Ruiz” records</span></div></div></section>
+    <div class="row"><button class="btn primary" data-act="saveCall" ${c.saved?'disabled':''}>${c.saved?'Saved':'Confirm and save'}</button><button class="btn" data-act="draftCall">Save draft</button><span class="mono faint small">documentation so far: <span data-live="doctimer">${docMin()}</span> min</span></div>
+    ${!allJ&&!c.saved?`<p class="small muted" style="margin:0">${jf.length-jDone} judgment field${jf.length-jDone===1?'':'s'} left before saving.</p>`:''}
+    <section class="card"><div class="card-h"><h2>Before | After</h2><span class="mono" style="font:600 22px var(--mono);color:var(--head)">31/40</span></div><div class="card-b"><table class="ba"><thead><tr><th></th><th style="text-align:center">Today</th><th style="text-align:center">Handoff</th></tr></thead><tbody>
+     <tr><td>Documentation per conversation</td><td><div class="t">35 min</div></td><td><div class="h">15 min</div></td></tr>
+     <tr><td>Fields typed</td><td><div class="t">40</div></td><td><div class="h">9</div></td></tr>
+     <tr><td>Screens to open</td><td><div class="t">6–7</div></td><td><div class="h">1</div></td></tr>
+     <tr><td>Connect rate per attempt</td><td><div class="t">14%</div></td><td><div class="h">25%</div></td></tr></tbody></table>
+     <p class="xs faint" style="margin:8px 0 0">35 = 40 fields × 25 s + care plan 8 + note 10. 15 = 31 confirms × 6 s + 9 typed × 40 s + review 6 (annex “Assessment (40 fields)”).</p></div></section>
+   </div></div>`;
+}
+const fmtDur=s=>`${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
+
+/* =========================================================
+   Screen 4: Flag review (Gloria)
+   ========================================================= */
+function rFlag(){
+  const st=S.flag;
+  return `<div class="page-h"><div><span class="muted">Flag review</span><h1 style="font-size:28px">Gloria Mensah, 67 · “stopped metformin”</h1><p>Right member, wrong problem. The workbench never deletes a flag: it shows its basis, downgrades it when sources disagree, and lets Maria decide.</p></div>
+   <div class="row">${chip('unknown','Downgraded to unknown')}<span class="chip star" style="border-radius:13px;min-height:26px;font-size:13px">Right member, wrong problem</span></div></div>
+  <section class="card"><div class="card-b" style="padding:20px">
+   <div class="vs"><div class="box"><div class="l">Risk model says</div><b>Non-adherent: metformin PDC 0.42</b><span class="mono faint small">claims-only · last metformin claim 26 Aug</span></div>
+    <div class="box win"><div class="l">Workbench says</div><b>Probably taking it, paying cash elsewhere. The real problems: a wrongful denial and A1c 9.2%.</b><span class="mono faint small">no claim is not the same as no medicine</span></div></div>
+   <h2 style="margin:22px 0 10px">Four signals point the other way</h2>
+   <div style="overflow-x:auto"><table class="sig"><thead><tr><th></th><th>Signal</th><th>Source</th><th>What it means</th></tr></thead><tbody>
+    <tr><td class="mono">1</td><td>Asked member services if she can use a discount card for metformin at ValueRx</td><td class="s">member-services log, 2 Oct</td><td>Fills moved outside the plan</td></tr>
+    <tr><td class="mono">2</td><td>Empagliflozin <b>denied</b>: “no metformin claim in 60 days”</td><td class="s">Part D coverage denial, 22 Oct · appeal within 65 days</td><td>The same data gap blocked her next drug</td></tr>
+    <tr><td class="mono">3</td><td>A1c 7.4% (May) to <span class="mono">77 mmol/mol</span> = 9.2% (Oct)</td><td class="s">two labs, two units</td><td>Rising; no SGLT2 started explains it too</td></tr>
+    <tr><td class="mono">4</td><td>Metformin is tier 1, <b>$0</b> at preferred pharmacies</td><td class="s">plan formulary</td><td>A plan-card fill costs nothing and counts</td></tr></tbody></table></div>
+   <div class="hr" style="margin:18px 0"></div>
+   <div class="between" style="align-items:center;flex-wrap:wrap"><p style="margin:0;max-width:760px"><b>Suggested, not first today:</b> this week, text first, then call 16:00–16:30. Confirm where she fills metformin; Dr. Nair appeals the empagliflozin denial with that evidence (window closes 26 Dec). Ask her to use her plan card: it counts for her record and the plan’s adherence measure. A1c 9.2%: book a diabetes visit.</p>
+    <div class="row">${st?`${chip(st==='accepted'?'ok':'confirm',st==='accepted'?'Accepted · 3 tasks added':'Flag kept · reason logged')}<button class="btn sm" data-act="flagReset">Undo</button>`:`<button class="btn" data-act="keepFlag">Keep flag</button><button class="btn primary" data-act="acceptFlag">Accept · add 3 tasks</button>`}</div></div>
+  </div></section>
+  <div class="grid-main" style="margin-top:18px"><section class="card"><div class="card-h"><h2>Why this matters to the plan</h2></div><div class="card-b sit">
+   <div>${'<span class="chip star">Blood sugar controlled (3)</span>'} A1c 9.2%: at risk. A diabetes visit and an unblocked SGLT2 move it.</div>
+   <div>${'<span class="chip star">Part D diabetes adherence (3)</span>'} Cash fills are invisible to the claims-only measure: the plan loses Star credit even though she takes the drug.</div>
+   <div class="muted small">Coaching “adherence” would spend Maria’s call on the wrong problem and damage trust. The workbench asks before it coaches.</div></div></section>
+   <section class="card"><div class="card-h"><h2>What a Phase 2 feed would add</h2></div><div class="card-b small"><p style="margin:0 0 8px">A dispensed-history feed (incl. cash) would show metformin dispensed <span class="mono">24 Sep</span> and <span class="mono">23 Oct</span> at ValueRx and resolve this flag automatically.</p><p class="muted" style="margin:0">Deliberately not in the MVP: new data contract, value per effort 1.03 (annex “Prioritisation”).</p></div></section></div>`;
+}
+
+/* =========================================================
+   Screen 5: Data & trust
+   ========================================================= */
+const DNAMES={D1:'Who first today?',D2:'What changed? Safe on meds?',D3:'Can I reach them?',D4:'Needs beyond the clinical?',D5:'Due, blocked, promised?'};
+const prio=p=>/^MVP-lite/.test(p)?'lite':/^MVP/.test(p)?'mvp':'later';
+const primaryD=d=>{ const n=d[0]; if([12,13,14,24].includes(n))return'D3'; if([9,10,11,17,22,23].includes(n))return'D5'; if([3,4,5,6,7,8,27].includes(n))return'D2'; if([15,16,20,21,28].includes(n))return'D4'; const m=String(d[3]).match(/D\d/); return m?m[0]:'D1';};
+function rData(){
+  const t=S.dataTab;
+  const tabs=[['datasets','28 datasets'],['recipes','16 recipes'],['clocks','Expectation clocks'],['trust','Trust model'],['ai','AI responsibilities'],['imperf','27 planted imperfections']];
+  return `<div class="page-h"><div><h1>Data &amp; trust</h1><p>Organised by the five decisions Maria makes every morning, not by source system. A dataset earns an MVP slot only if it changes a decision, already sits inside the plan or a HiLabs pipe, and its quality problem can be labelled.</p></div></div>
+  <div class="tabs" style="margin-bottom:16px" role="group" aria-label="Data views">${tabs.map(([k,l])=>`<button data-dt="${k}" aria-pressed="${t===k}">${l}</button>`).join('')}</div>
+  ${{datasets:dDatasets,recipes:dRecipes,clocks:dClocks,trust:dTrust,ai:dAI,imperf:dImperf}[t]()}`;
+}
+function dDatasets(){
+  const ds=ANNEX.datasets; const cnt={mvp:0,lite:0,later:0}; ds.forEach(d=>cnt[prio(d[7])]++);
+  const f=S.dfilter;
+  const cols=['D1','D2','D3','D4','D5'].map(D=>{const list=ds.filter(d=>primaryD(d)===D);
+    const c={mvp:0,lite:0}; list.forEach(d=>{const p=prio(d[7]); if(c[p]!=null)c[p]++;});
+    return `<div class="dcol"><div class="dcol-h"><span class="k">${D} · ${c.mvp} MVP${c.lite?` + ${c.lite} lite`:''}</span><b>${DNAMES[D]}</b></div><div class="dcol-b">${list.map(d=>{const p=prio(d[7]);return `<button class="dtile ${p==='lite'?'lite':p==='later'?'later':''} ${f!=='all'&&f!==p?'dim':''}" data-ds="${d[0]}"><b>${d[0]}. ${esc(d[1])}</b><span>${esc(d[4])} · ${esc(String(d[6]).split(/[;.]/)[0])}</span></button>`}).join('')}</div></div>`}).join('');
+  const sel=S.dsel?ds.find(d=>d[0]===S.dsel):null;
+  return `<div class="between" style="margin-bottom:12px;flex-wrap:wrap"><div class="tabs" role="group" aria-label="Priority">${[['all','All 28'],['mvp',`MVP (${cnt.mvp})`],['lite',`MVP-lite (${cnt.lite})`],['later',`Later (${cnt.later})`]].map(([k,l])=>`<button data-df="${k}" aria-pressed="${f===k}">${l}</button>`).join('')}</div><span class="muted small">Click any tile for source, freshness, quality problems and what Maria does differently.</span></div>
+  <div class="dgrid">${cols}</div>
+  ${sel?dsDrawer(sel):''}
+  <section class="card" style="margin-top:18px"><div class="card-h"><h2>Four non-obvious picks</h2></div><div class="card-b" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px">
+   ${[['UM review notes','the plan knows why Walter was admitted, on day 0'],['Formulary flag + pharmacy rejects','predict the reject on Friday; catch Saturday’s if it happens'],['Member-services log','Gloria’s answer sits in another department'],['MCheck® Directory Accuracy','a ghost PCP is still assigned to Dwayne']].map(([a,b],i)=>`<div class="row" style="align-items:flex-start;flex-wrap:nowrap">${pin(i+1)}<div><b>${a}:</b> ${b}</div></div>`).join('')}</div></section>`;
+}
+function dsDrawer(d){
+  return `<div class="scrim" data-act="closeDs" style="background:transparent;place-items:stretch;padding:0"></div><aside class="drawer" role="dialog" aria-label="${esc(d[1])}"><div class="drawer-h"><div><span class="mono muted small">Dataset ${d[0]} · ${esc(primaryD(d))} · ${esc(d[7])}</span><h2 style="margin-top:4px">${esc(d[1])}</h2></div><button class="iconbtn" data-act="closeDs" aria-label="Close">${ic('close',16)}</button></div>
+  <div class="drawer-b">${[['Source / standard',d[2]],['Tells Maria',d[3]],['Typical freshness',d[4]],['Expected quality problems',d[5]],['How the product handles it',d[6]],['What Maria does differently',d[8]],['Where in the annex',d[9]]].map(([k,v])=>`<div style="padding:10px 0;border-bottom:1px solid var(--rule)"><div class="eyebrow muted" style="font-size:11px">${k}</div><div style="margin-top:3px">${esc(v)}</div></div>`).join('')}</div></aside>`;
+}
+function dRecipes(){
+  const f=S.rfilter; const list=ANNEX.recipes.filter(r=>f==='all'||r[6].includes(f));
+  return `<div class="tabs" style="margin-bottom:12px" role="group" aria-label="Patient">${[['all','All'],['P1','Walter'],['P2','Gloria'],['P3','Dwayne'],['P4','Andre'],['P5','Rosa']].map(([k,l])=>`<button data-rf="${k}" aria-pressed="${f===k}">${l}</button>`).join('')}</div>
+  <section class="card">${list.map(r=>{const ins=String(r[2]).split(/ \+ /);const safety=/Safety recipe/.test(r[5]);
+    return `<div class="recipe" id="recipe-${r[0]}"><div><div class="id">${r[0]}</div>${safety?`<span class="tag soft" style="margin-top:6px;font-size:11px">safety</span>`:''}</div>
+    <div><b>${esc(r[1])}</b><div class="eq" style="margin-top:6px">${ins.map(i=>`<span class="in">${esc(i)}</span>`).join('<span class="op">+</span>')}<span class="op">=</span><span class="out">${esc(r[3])}</span><span class="op">→</span><span class="act">${esc(r[4])}</span></div><div class="xs faint mono" style="margin-top:6px">${esc(r[5])} · rows ${esc(r[7])}</div></div>
+    <div class="row" style="justify-content:flex-end">${String(r[6]).split(/, ?/).map(p=>PMAP[p]?`<button class="chip line" data-member="${PMAP[p]}">${M[PMAP[p]].name.split(' ')[0]}</button>`:'').join('')}</div></div>`}).join('')}</section>
+  <p class="muted small">Safety recipes fire on one source (recall first); nudge recipes need two (precision first).</p>`;
+}
+function dClocks(){
+  const steps=[['D+2 bus. days','Member contacted','caselet',0],['D+2','Discharge summary with med list','HEDIS TRC',0],['D+3','New prescriptions expected filled; a reject means now','only 54% are filled even by D+7 (2,626 of 4,873; Bessette, JAMA IM 2026)',1],['D+7','Follow-up visit','caselet; Hernandez 2010',0],['D+30','Medication reconciliation documented (an RN may do it)','HEDIS TRC',0]];
+  return `<div class="grid-main"><section class="card"><div class="card-h"><div><h2>Every event creates the data we expect next</h2><p>If it hasn’t arrived, the product says so instead of staying silent.</p></div></div><div style="overflow-x:auto"><table class="ttable"><thead><tr><th>Trigger</th><th>We expect</th><th>By</th><th>Rule source</th><th>If missing</th><th>Example</th></tr></thead><tbody>${ANNEX.clocks.map(r=>`<tr>${r.map((c,i)=>`<td class="${i===2?'mono':''}">${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div></section>
+  <section class="card"><div class="card-h"><h2>Expectation clock after discharge (D0)</h2></div><div class="card-b"><div class="dclock">${steps.map(([k,a,b,h])=>`<div class="s ${h?'hot':''}"><span class="k">${k}</span><div><b>${a}</b><div class="small ${h?'':'muted'}" style="${h?'color:var(--red)':''}">${b}</div></div></div>`).join('')}</div>
+  <div class="callout blue small" style="margin-top:14px"><b>Absence is data:</b> the product watches for what should have arrived, not just what did.</div></div></section></div>`;
+}
+function dTrust(){
+  const rows=[['ok','Verified','Fresh enough for this decision, no conflict','Walter: sacubitril/valsartan rejected 7 Nov 15:10 (code 75)'],['confirm','Confirm on call','Old, single-source, member-reported or AI-read','Dwayne: new number 555-0119 (2 sources, never dialled)'],['conflict','Conflict','Sources disagree; both are shown','Walter: plan stops lisinopril vs 90-day refill paid 4 Nov'],['expected','Expected, not received','A clock says it should exist by now','Walter: discharge summary due Mon 23:59'],['unknown','Unknown','No data since a date; never shown as “no”','Walter: cardiology follow-up booked?']];
+  return `<div class="grid-main"><section class="card"><div class="card-h"><div><h2>Two channels, never mixed</h2><p>Chip = how sure we are. Red tag = what to act on. One fact can carry both.</p></div></div><div class="card-b">
+   <div class="row" style="margin-bottom:14px">${tag()}<span class="muted">+</span>${chip('ok','New HF drug rejected · Verified')}</div>
+   <table class="ttable"><thead><tr><th>Chip</th><th>Meaning</th><th>Example in the annex</th></tr></thead><tbody>${rows.map(([k,l,m,e])=>`<tr><td>${chip(k,l)}</td><td>${m}</td><td class="muted">${e}</td></tr>`).join('')}</tbody></table></div></section>
+   <section class="card"><div class="card-h"><h2>Rules</h2></div><div class="card-b"><ol style="margin:0;padding-left:20px;display:grid;gap:8px"><li><b>Unknown is not no.</b> Absence never renders as a negative.</li><li><b>The newest verified source wins;</b> older ones stay visible.</li><li><b>AI-read facts need a clinician’s confirmation</b> before they show as verified.</li><li><b>Every confirmation writes back</b> as clinician-verified, so one call cleans the record for UM, member services and the next case manager.</li><li><b>Safety recipes fire on one source;</b> nudges need two.</li></ol>
+   <p class="muted small" style="margin:14px 0 0">Hover any chip in the prototype to see its source, arrival time and rule.</p></div></section></div>`;
+}
+function dAI(){
+  const cols=[['Automated, no confirm','var(--greent)','var(--green)',['Dedupe ADT, stamp freshness','Run clocks, rank numbers','Suppress reassigned numbers','Normalise lab units','Flag a formulary PA need','Re-rank or downgrade a flag when sources conflict (shown, reversible)']],
+   ['AI suggests, Maria confirms','var(--ambert)','var(--amber)',['Reason for admission','Discharge med list','Next best action','Pre-filled fields, note draft, prescriber packet','Caregiver-strain cue; identity link (steward)']],
+   ['Maria only','var(--tint)','var(--head)',['Illness severity','Medicine concerns to the prescriber','Caregiver judgment','Consent decisions','Closing a case']],
+   ['Never in MVP','var(--greyt)','var(--grey)',['AI voice calls to members','AI changing a care plan','Part 2 content without consent']]];
+  const steps=['Signals · 28 datasets, trust-labelled','Clocks · what’s due or missing','Score · urgency × impact × can-act-today','Action + 2 alternatives, each with a reason','Maria confirms or overrides · reason captured','Write-back · override reasons reviewed monthly'];
+  return `<section class="card" style="margin-bottom:18px"><div class="card-h"><div><h2>How next best action works</h2><p>Step 5 is the human gate: nothing reaches a member or a care plan without Maria.</p></div></div><div class="card-b" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px">${steps.map((s,i)=>`<div style="border:${i===4?'2px solid var(--head)':'1px solid var(--rule)'};border-radius:8px;padding:10px 12px;${i===4?'background:var(--tint)':''}"><div class="row" style="flex-wrap:nowrap">${pin(i+1,i!==4)}<b style="font-size:13.5px">${s.split(' · ')[0]}</b></div><div class="small muted" style="margin-top:4px">${s.split(' · ')[1]||''}</div></div>`).join('')}</div></section>
+  <section class="card"><div class="card-h"><div><h2>AI responsibility matrix</h2><p>What is automated, and what a clinician must confirm.</p></div></div><div class="card-b"><div class="matrix">${cols.map(([h,bg,fg,items])=>`<div class="mc"><h3 style="background:${bg};color:${fg}">${h}</h3>${items.map(i=>`<div>${i}</div>`).join('')}</div>`).join('')}</div>
+  <div class="hr"></div><p class="small muted" style="margin:0"><b>Tested by:</b> golden set (~500 notes, double-labelled by 2 RNs) · ≥95% field accuracy to go live · span grounding · abstention · 5% weekly audit · edit rate 2–15% (&lt;2% = rubber-stamping, &gt;15% = not ready). LLM only for free text; it quotes its source and abstains when unsure.</p></div></section>`;
+}
+function dImperf(){
+  const f=S.ifilter; const list=ANNEX.imperf.filter(r=>f==='all'||r[1]===f);
+  return `<div class="tabs" style="margin-bottom:12px" role="group" aria-label="Patient">${[['all','All 27'],['P1','Walter'],['P2','Gloria'],['P3','Dwayne'],['P4','Andre'],['P5','Rosa']].map(([k,l])=>`<button data-if="${k}" aria-pressed="${f===k}">${l}</button>`).join('')}</div>
+  <section class="card" style="overflow-x:auto"><table class="ttable"><thead><tr><th>#</th><th>Member</th><th>Dataset</th><th>Imperfection</th><th>How a naive tool is fooled</th><th>How the handoff handles it</th><th>Screen</th></tr></thead><tbody>${list.map(r=>`<tr><td class="mono">${r[0]}</td><td><button class="link" data-member="${PMAP[r[1]]}">${M[PMAP[r[1]]].name.split(' ')[0]}</button></td><td>${esc(r[2])}</td><td><b style="font-weight:500">${esc(r[3])}</b></td><td class="muted">${esc(r[4])}</td><td>${esc(r[5])}</td><td class="muted">${esc(r[6])}</td></tr>`).join('')}</tbody></table></section>`;
+}
+
+/* =========================================================
+   Screen 6: Impact (live time model) + pilot
+   ========================================================= */
+function tmCalc(x){
+  const shift=480, prepped=10, talk=25, conv=3, coord=60, admin=45, fpc=2.5;
+  const lost=x.triage+prepped*x.prep+x.failed*fpc+conv*x.doc;
+  const used=lost+conv*talk+coord+admin;
+  const freed=Math.max(0,shift-used);
+  const cost=talk+x.doc+x.prep+2*fpc;
+  const added=Math.floor(freed/cost);
+  const convs=conv+added;
+  const lostAfter=x.triage+x.prep*(prepped+added)+(x.failed+2*added)*fpc+x.doc*convs;
+  const over=lostAfter/convs;
+  const connect=convs/(convs+x.failed+2*added);
+  const cap=freed/shift*97550*1.3;
+  return {lost,used,freed,added,convs,over,connect,cap,ratio:cap/6000,cost};
+}
+function blocks(x,mode){
+  const c=tmCalc(x); const lostB=Math.round(c.lost/10), talkB=7.5, other=10.5;
+  const cells=[]; for(let i=0;i<48;i++){
+    let k; if(i<lostB)k='lost'; else if(i<lostB+8)k='talk'; else if(i<lostB+18)k='other'; else k='free';
+    cells.push(k);}
+  // talking = 7.5 blocks: render 8th as half via gradient
+  return `<div class="blocks" role="img" aria-label="${mode}: ${Math.round(c.lost/10)} of 48 blocks lost to data and paperwork">${cells.map((k,i)=>`<i class="blk ${k}" ${k==='talk'&&i===lostB+7?'style="background:linear-gradient(90deg,var(--blue) 50%,var(--blk-other) 50%)"':''}></i>`).join('')}</div>`;
+}
+function rImpact(){
+  const x=S.tm, c=tmCalc(x), base=tmCalc({triage:30,prep:12,failed:18,doc:35});
+  const sl=(k,l,min,max,step,u)=>`<div class="sl"><label for="sl-${k}">${l}</label><input type="range" id="sl-${k}" data-tm="${k}" min="${min}" max="${max}" step="${step}" value="${x[k]}"><output class="mono">${x[k]}${u}</output></div>`;
+  const preset=(a,b,c2,d)=>x.triage===a&&x.prep===b&&x.failed===c2&&x.doc===d;
+  const be=6000/(230*126815/(230*480));
+  return `<div class="page-h"><div><h1>Where Maria’s 480 minutes go, and what the pilot buys back</h1><p>A live version of the annex “Time model”. Drag the inputs: the 48 blocks, conversations per day, overhead per conversation and the pilot economics recompute with the annex formulas.</p></div>
+   <div class="tabs" role="group" aria-label="Scenario"><button data-preset="today" aria-pressed="${preset(30,12,18,35)}">Today</button><button data-preset="cons" aria-pressed="${preset(20,7,15,25)}">Conservative</button><button data-preset="target" aria-pressed="${preset(10,4,12,15)}">Target</button></div></div>
+  <div class="kpi" style="margin-bottom:18px" data-tour="kpi">
+   <div><div class="v">${base.convs} → ${c.convs}</div><div class="l">Members reached with a confirmed next step, per nurse-day (north star; go-gate ≥ 4)</div></div>
+   <div><div class="v">${Math.round(base.over)} → ${Math.round(c.over)}<small> min</small></div><div class="l">Overhead per member conversation</div></div>
+   <div><div class="v">${Math.round(c.freed*10)/10}<small> min/day</small></div><div class="l">Freed before reinvestment (break-even ${Math.round(be)} min)</div></div>
+   <div><div class="v">${c.ratio.toFixed(1)}<small>x</small></div><div class="l">Capacity value ÷ price ($${Math.round(c.cap/100)/10}k per nurse-year vs $6.0k)</div></div></div>
+  <div class="grid-main g2">
+   <section class="card"><div class="card-h"><div><h2>One block = ten minutes</h2><p>Red = lost to data and paperwork · blue = talking to members · grey = coordination, huddles, admin · outlined = freed</p></div></div>
+    <div class="card-b" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:22px">
+     <div><div class="eyebrow muted" style="margin-bottom:8px">Today</div>${blocks({triage:30,prep:12,failed:18,doc:35},'Today')}<p class="small" style="margin:10px 0 0"><b class="mono" style="color:var(--red)">${Math.round(base.lost/10)}</b> of 48 blocks lost · <b class="mono">7½</b> talking</p></div>
+     <div><div class="eyebrow muted" style="margin-bottom:8px">With MCheck® Handoff</div>${blocks(x,'With handoff')}<p class="small" style="margin:10px 0 0"><b class="mono" style="color:var(--red)">${Math.round(c.lost/10*2)/2}</b> lost · <b class="mono" style="color:var(--green)">${Math.round(c.freed/10*2)/2}</b> freed → +${c.added} conversation${c.added===1?'':'s'}</p></div></div></section>
+   <section class="card" data-tour="sliders"><div class="card-h"><div><h2>Inputs</h2><p>Blue cells in the annex. Today = our estimate; pilot week 1 replaces it with logs.</p></div></div><div class="card-b">
+    ${sl('triage','Find who needs me (min/day)',5,40,5,'')}${sl('prep','Prep minutes per member (10 members)',2,15,1,'')}${sl('failed','Failed outreach attempts per day (2.5 min each)',6,24,1,'')}${sl('doc','Documentation minutes per conversation',10,40,1,'')}
+    <div class="mrow" style="margin-top:6px"><span>Cost of one added conversation (talk 25 + docs + prep + 2 failed dials)</span><span>${c.cost} min</span></div>
+    <div class="mrow"><span>Connect rate per attempt</span><span>${Math.round(base.connect*100)}% → ${Math.round(c.connect*100)}%</span></div>
+    <div class="mrow"><span>Loaded cost per nurse (BLS $97,550 × 1.3)</span><span>$126.8k</span></div>
+    <div class="mrow" style="border-bottom:0"><span>Break-even = $6,000 ÷ (230 days × $1.149/min)</span><span>${be.toFixed(1)} min/day</span></div></div></section></div>
+  <div class="grid-main g3" style="margin-top:18px">
+   <section class="card"><div class="card-h"><h2>How we’ll know</h2></div><div class="card-b mtree"><div class="ns"><span>Members reached with a confirmed next step, per nurse per day</span><b>3 → 6</b></div>
+    ${[['Prep per member','12 → 4 min'],['Documentation per conversation','35 → 15 min'],['Connect rate per attempt','14% → 25%'],['Discharges contacted ≤ 2 business days','→ 90%'],['TRC composite','4★ (≥ 69%)'],['7-day follow-up after discharge','+10 pts'],['30-day readmissions','−1 pt'],['After-hours documentation','−50%']].map(([a,b])=>`<div class="mrow"><span>${a}</span><span>${b}</span></div>`).join('')}
+    <div class="guard"><b style="color:var(--red)">Guardrails against empty calls</b><br>Call-quality audit ≥ baseline; median call ≥ 15 min · ≥ 70% of top-10 acted on same day · 2–15% of AI-read facts edited; &lt; 1% error escape · reach gap ≤ 5 pts · caseload held at 48</div></div></section>
+   <section class="card"><div class="card-h"><h2>What we build first</h2><span class="mono faint xs">budget 13 points</span></div><div class="card-b">
+    ${[['Clocks + safety recipes','3.60','S · 1'],['Best-number + text-first','2.90','S · 2'],['Queue + NOW / scheduled lanes','1.78','M · 4'],['Confirm, don’t type','1.78','M · 6'],['Handoff + med-list diff','1.58','L · 9'],['Clock-load + capacity routing','1.45','M · 11'],['Write-back of confirmed facts','1.33','M · 13']].map(([a,b,c2])=>`<div class="mrow" style="background:var(--greent);padding:7px 8px;border-radius:4px;margin-bottom:3px;border:0"><span>${a}</span><span>${b} · ${c2}</span></div>`).join('')}
+    <div style="border-top:1.5px dashed var(--blue);margin:8px 0;padding-top:6px" class="xs" ><span style="color:var(--blue-ink);font-weight:600">Build budget: 13 points</span></div>
+    ${[['Contact ledger','1.30'],['Ambient listening (partner)','1.28'],['Member SMS scheduling','1.13'],['Dispensed-history feed','1.03'],['Provider booking (Outreach Intelligence)','1.00'],['Medicaid LTSS','0.47']].map(([a,b])=>`<div class="mrow muted"><span>${a}</span><span>${b}</span></div>`).join('')}
+    <p class="small muted" style="margin:10px 0 0"><b>Deliberately out:</b> AI voice calls to members · a new risk model · a chat copilot · a member app · replacing the CM system of record</p></div></section>
+   <section class="card"><div class="card-h"><h2>A 90-day, 20-nurse pilot</h2></div><div class="card-b">
+    <div class="phase"><div><b>Q1 2027</b>Build · 2 squads, 13 points</div><div><b>Wk 0–2</b>Connect · read-only on the CM system</div><div><b>Wk 3–4</b>Shadow · handoffs vs nurses’ own prep</div><div><b>Wk 5–12</b>Live · 20 nurses vs 20 matched controls</div></div>
+    <div class="callout green small" style="margin-top:14px"><b>Go if</b> (= conservative case): ≥ 4 conversations per nurse-day · prep ≤ 7 min · ≥ 95% field accuracy · ≥ 70% of top-10 acted on · no attributable safety event</div>
+    <div class="callout red small" style="margin-top:8px"><b>Stop if</b> &gt; 2% errors in confirmed notes, or nurse trust &lt; 3/5. Readmissions cannot be proven in 90 days.</div>
+    <div class="mrow" style="margin-top:10px"><span>Price signal</span><span>$500 / nurse-seat / month</span></div>
+    <div class="mrow"><span>Pilot fee, credited on conversion</span><span>$45k</span></div>
+    <div class="mrow" style="border-bottom:0"><span>20-nurse pod capacity / year</span><span>$${(c.cap*20/1e6).toFixed(2)}M vs $0.12M</span></div></div></section></div>`;
+}
+
+/* =========================================================
+   Modals, drawers, palette
+   ========================================================= */
+const $ov=document.getElementById('overlay');
+function modal(html){ $ov.innerHTML=`<div class="scrim" data-act="closeModal">${html}</div>`; const f=$ov.querySelector('input,button.primary,button'); f&&f.focus(); }
+function closeModal(){ $ov.innerHTML=''; }
+function dwayneModal(){
+  const items=[['num','New number (614) 555-0119 is Dwayne’s','ED case manager checks with him at the bedside'],['sms','Text consent captured','TCPA: texting only with consent'],['inh','Controller inhaler (umeclidinium/vilanterol) before he leaves','ED pharmacy dispenses a starter'],['fqhc','Warm handoff to Eastfield FQHC + ride (D-SNP transport)','Assigned PCP left in August (ghost listing)']];
+  modal(`<div class="modal" role="dialog" aria-label="Call Riverbend ED case manager"><div class="modal-h"><div><span class="stamp">Mon 08:04 · NOW lane</span><h2 style="margin-top:4px">Calling Riverbend ED case manager</h2><p class="muted small" style="margin:4px 0 0"><span class="mono">(614) 555-0131</span> · from MCheck Directory Accuracy · Dwayne in the ED for ${edTimer()}</p></div><button class="iconbtn" data-act="closeModal" aria-label="Close">${ic('close',16)}</button></div>
+   <div class="modal-b">${items.map(([k,a,b])=>`<label class="check"><input type="checkbox" data-dw="${k}"><div><b>${a}</b><div class="muted small">${b}</div></div></label>`).join('')}
+   <p class="small muted" style="margin:12px 0 0">Ticked items write back plan-wide as clinician-verified: eligibility, member services and the next case manager see the new number.</p></div>
+   <div class="modal-f"><button class="btn" data-act="closeModal">Cancel</button><button class="btn primary" data-act="saveDwayne">Save call &amp; write back</button></div></div>`);
+}
+function keepFlagModal(){
+  modal(`<div class="modal" role="dialog" aria-label="Keep flag"><div class="modal-h"><div><h2>Keep the “non-adherent” flag?</h2><p class="muted small" style="margin:4px 0 0">Overrides are welcome. The reason is captured and a clinical lead reviews override reasons monthly to re-weight the rules.</p></div><button class="iconbtn" data-act="closeModal" aria-label="Close">${ic('close',16)}</button></div>
+   <div class="modal-b">${['She told me she stopped metformin','I know this member: adherence is the issue','The signals are too old','Other'].map((r,i)=>`<label class="check"><input type="radio" name="kr" value="${esc(r)}" ${i===0?'checked':''}><div>${r}</div></label>`).join('')}</div>
+   <div class="modal-f"><button class="btn" data-act="closeModal">Cancel</button><button class="btn primary" data-act="keepFlagSave">Keep flag &amp; log reason</button></div></div>`);
+}
+function loadDetailModal(){
+  const lp=loadPlan(); const wed=Q.filter(q=>q.due.startsWith('Wed')).sort((a,b)=>b.score-a.score);
+  modal(`<div class="modal" role="dialog" aria-label="Wednesday clocks"><div class="modal-h"><div><h2>Wednesday: 12 clocks vs capacity 6</h2><p class="muted small" style="margin:4px 0 0">Proposed moves. The supervisor approves; licence and language are checked for the float nurse.</p></div><button class="iconbtn" data-act="closeModal" aria-label="Close">${ic('close',16)}</button></div>
+   <div class="modal-b"><table class="ttable"><thead><tr><th>Member</th><th>Clock</th><th>Score</th><th>Proposal</th></tr></thead><tbody>${wed.map(q=>`<tr><td>${esc(q.name)}</td><td class="mono">${esc(q.due)}</td><td class="mono">${q.score}</td><td>${lp.pulled.includes(q)?chip('expected','Pull to Mon–Tue'):q===lp.floatW?chip('confirm','Float nurse'):chip('ok','Keep Wed')}</td></tr>`).join('')}
+   <tr><td>${esc(lp.floatT.name)}</td><td class="mono">${esc(lp.floatT.due)}</td><td class="mono">${lp.floatT.score}</td><td>${chip('confirm','Float nurse (Thu)')}</td></tr></tbody></table></div>
+   <div class="modal-f"><button class="btn" data-act="closeModal">Close</button><button class="btn primary" data-act="rebalance">Send to supervisor</button></div></div>`);
+}
+function confirmHandoffModal(m){
+  const pending=m.ai.filter(a=>!S.aiConfirmed[m.key+':'+a.id]);
+  modal(`<div class="modal" role="dialog" aria-label="Confirm handoff"><div class="modal-h"><div><span class="stamp">Synthesis by receiver</span><h2 style="margin-top:4px">Confirm ${m.name.split(' ')[0]}’s handoff</h2><p class="muted small" style="margin:4px 0 0">AI-read facts are never shown as verified until you confirm them. Edit anything that is wrong; your edit is the training signal.</p></div><button class="iconbtn" data-act="closeModal" aria-label="Close">${ic('close',16)}</button></div>
+   <div class="modal-b">${m.ai.map(a=>{const ok=S.aiConfirmed[m.key+':'+a.id];return `<div class="check" style="cursor:default"><span>${ok?ic('check',18):ic('bang',18)}</span><div><b>${a.l}</b><div class="muted small">${a.d}</div>${ok?`<div style="margin-top:6px">${chip('ok','Confirmed '+ok)}</div>`:''}</div></div>`}).join('')}</div>
+   <div class="modal-f"><span class="small muted" style="margin-right:auto">Severity: <b>${S.severity[m.key]}</b> (yours)</span><button class="btn" data-act="closeModal">Not yet</button><button class="btn primary" data-act="confirmAll" data-m="${m.key}">${pending.length?`Confirm ${pending.length} &amp; save handoff`:'Save handoff'}</button></div></div>`);
+}
+function ledgerDrawer(){
+  $ov.innerHTML=`<div class="scrim" data-act="closeModal" style="background:var(--scrim)"></div><aside class="drawer" role="dialog" aria-label="Write-back record"><div class="drawer-h"><div><h2>Write-back record</h2><p class="muted small" style="margin:4px 0 0">Every confirmation updates the plan’s record as clinician-verified, so one call cleans the data for UM, member services and the next case manager.</p></div><button class="iconbtn" data-act="closeModal" aria-label="Close">${ic('close',16)}</button></div>
+  <div class="drawer-b">${S.ledger.length?S.ledger.map(l=>`<div class="ledger"><span class="t">${l.t}</span><div><div>${l.kind==='override'?chip('confirm','Override',null,'tiny'):l.kind==='task'?chip('expected','Task',null,'tiny'):l.kind==='route'?chip('expected','Routing',null,'tiny'):chip('ok','Write-back',null,'tiny')} <b>${esc(l.what)}</b></div><div class="ft">${l.from?`<s>${esc(l.from)}</s> → `:''}${esc(l.to)}${l.scope?` · ${esc(l.scope)}`:''}</div></div></div>`).join(''):`<p class="muted" style="padding:20px 0">Nothing written back yet. Call Dwayne’s ED case manager, confirm Walter’s handoff, or save Rosa’s call: each confirmation lands here.</p>`}</div></aside>`;
+}
+function helpModal(){
+  modal(`<div class="modal" role="dialog" aria-label="Keyboard shortcuts"><div class="modal-h"><h2>Keyboard shortcuts</h2><button class="iconbtn" data-act="closeModal" aria-label="Close">${ic('close',16)}</button></div><div class="modal-b"><table class="ttable"><tbody>
+   ${[['1 – 6','Queue · Member · Call · Flag · Data · Impact'],['Ctrl/⌘ K','Search members, screens and actions'],['J / K','Move through the queue'],['Enter','Open the selected member'],['T','Start or stop the guided tour'],['← / →','Previous / next tour step'],['D','Toggle dark mode'],['Esc','Close any panel']].map(([a,b])=>`<tr><td class="mono" style="white-space:nowrap">${a}</td><td>${b}</td></tr>`).join('')}</tbody></table></div></div>`);
+}
+let palItems=[], palSel=0;
+function palette(){
+  modal(`<div class="modal palette" role="dialog" aria-label="Search"><input id="palIn" placeholder="Search 48 members, screens, recipes, datasets…" autocomplete="off" aria-label="Search"><ul id="palList" role="listbox"></ul></div>`);
+  const inp=document.getElementById('palIn'); inp.focus(); palFill('');
+  inp.addEventListener('input',()=>palFill(inp.value));
+}
+function palFill(q){
+  const all=[
+    ...[['queue','Queue · who first today'],['member','Member handoff'],['call','Call & confirm · Rosa 15:42'],['flag','Flag review · Gloria'],['data','Data & trust'],['impact','Impact & pilot']].map(([k,l])=>({l,s:'Screen',f:()=>go(k)})),
+    ...Q.map(q=>({l:q.name,s:`#${q.rank} · ${q.program} · score ${q.score}`,f:()=>go('member',{member:q.key||q.name})})),
+    ...ANNEX.recipes.map(r=>({l:`${r[0]} · ${r[1]}`,s:'Recipe',f:()=>{S.dataTab='recipes';S.rfilter='all';go('data')}})),
+    ...ANNEX.datasets.map(d=>({l:`${d[1]}`,s:`Dataset ${d[0]} · ${d[7]}`,f:()=>{S.dataTab='datasets';S.dsel=d[0];go('data')}})),
+    {l:'Start guided tour',s:'Action',f:()=>startTour()},{l:'Open write-back record',s:'Action',f:()=>ledgerDrawer()}];
+  const t=q.toLowerCase().trim();
+  palItems=(t?all.filter(i=>(i.l+' '+i.s).toLowerCase().includes(t)):all.slice(0,14)).slice(0,40); palSel=0;
+  document.getElementById('palList').innerHTML=palItems.map((i,n)=>`<li role="option" data-pal="${n}" aria-selected="${n===0}">${esc(i.l)}<span>${esc(i.s)}</span></li>`).join('')||'<li class="muted">No results</li>';
+}
+
+/* =========================================================
+   Provenance popover
+   ========================================================= */
+const $prov=document.getElementById('prov');
+function showProv(el){
+  const [src,rec,note]=el.dataset.prov.split('|');
+  $prov.innerHTML=`<div class="pk">Source</div><div>${esc(src)}</div>${rec?`<div class="pk" style="margin-top:6px">Arrived / freshness</div><div class="pv">${esc(rec)}</div>`:''}${note?`<div class="pk" style="margin-top:6px">Rule</div><div>${esc(note)}</div>`:''}`;
+  $prov.hidden=false; const r=el.getBoundingClientRect(); const w=$prov.offsetWidth,h=$prov.offsetHeight;
+  let x=Math.min(window.innerWidth-w-10,Math.max(10,r.left)); let y=r.bottom+8; if(y+h>window.innerHeight-10) y=r.top-h-8;
+  $prov.style.left=x+'px'; $prov.style.top=y+'px';
+}
+document.addEventListener('mouseover',e=>{const el=e.target.closest('[data-prov]'); if(el&&el.dataset.prov) showProv(el); else $prov.hidden=true;});
+document.addEventListener('focusin',e=>{const el=e.target.closest('[data-prov]'); if(el&&el.dataset.prov) showProv(el); else $prov.hidden=true;});
+window.addEventListener('scroll',()=>{$prov.hidden=true; if(S.tour) placeSpot();},{passive:true});
+
+/* =========================================================
+   Guided tour: Maria's Monday, mapped to the deck
+   ========================================================= */
+const TOUR=[
+ {s:'queue',t:'08:00',sel:'[data-tour="now"]',h:'Reachable now jumps the queue',p:'Dwayne arrived in the Riverbend ED at 07:12. A reachable moment is time-boxed, so it sits in a NOW lane above the ranking. The timer is live.',slide:'Slide 7 · pin 1'},
+ {s:'queue',t:'08:00',sel:'[data-tour="numbers"]',h:'Number check',p:'The number in eligibility belongs to a stranger: suppressed by the FCC reassigned-numbers check plus a “wrong person” call. A new number exists only in the ED and pharmacy records.',slide:'Slide 7 · pin 2'},
+ {s:'queue',t:'08:00',sel:'[data-tour="ranked"]',h:'An explainable score, no black box',p:'Score = 100 × Urgency × Impact/5 × Actionability, from the annex’s 48-member caseload. Click “Why” on any row to see the three factors.',slide:'Slide 7 · pin 3',act:()=>{S.whyOpen={'Walter Okafor':true};}},
+ {s:'queue',t:'08:00',sel:'[data-tour="legend"]',h:'Two channels, never mixed',p:'The red tag says what to act on today. The tinted chip says how sure we are. Hover any chip to see its source, arrival time and rule.',slide:'Slide 7 · pin 4'},
+ {s:'queue',t:'08:00',sel:'[data-tour="overnight"]',h:'Done overnight',p:'What automation did, and what still waits for Maria. Nothing here changes a care plan.',slide:'Slide 7 · pin 5'},
+ {s:'queue',t:'08:00',sel:'[data-tour="expected"]',h:'Expected, not received',p:'Absence is data. Walter’s discharge summary is due tonight under the TRC rule; the screen says so instead of staying silent.',slide:'Slide 7 · pin 6'},
+ {s:'queue',t:'08:00',sel:'[data-tour="sched"]',h:'Scheduled today',p:'Rosa’s 15:35 call sits above the ranking, with its 11:00 dependency, so a booked call never looks like low priority.',slide:'Slide 7 · pin 7'},
+ {s:'queue',t:'08:00',sel:'[data-tour="load"]',h:'Wednesday’s spike, seen on Monday',p:'12 clocks fall due on Wednesday against a capacity of 6. Try “Send to supervisor”: 5 calls are pulled forward and 2 go to a licensed float nurse.',slide:'Slide 7 · pin 8'},
+ {s:'queue',t:'08:04',sel:'[data-tour="now"]',h:'08:04: Maria calls the ED',p:'Calling the ED case manager confirms the new number, gets text consent, sends Dwayne home with his controller inhaler and sets up the FQHC handoff. Every tick writes back plan-wide.',slide:'Slide 7 · walkthrough',act:()=>{if(!S.dwayneDone) setTimeout(dwayneModal,350);}},
+ {s:'member',m:'walter',t:'08:15',sel:'[data-tour="severity"]',h:'08:15: Walter’s handoff, severity first',p:'The member view reads like an I-PASS handoff, a format Maria knows from the ICU. Illness severity is hers alone to set.',slide:'Slide 8 · pin 1'},
+ {s:'member',m:'walter',t:'08:15',sel:'[data-tour="reason"]',h:'Reason for admission on day 0',p:'The ADT alert had no diagnosis. The reason is read from the UM review note and marked AI-read until Maria confirms it.',slide:'Slide 8 · pin 2'},
+ {s:'member',m:'walter',t:'08:15',sel:'[data-tour="timeline"]',h:'What changed since her last call',p:'Including Friday’s predictable reject: the UM note named a drug the formulary flags “PA required”, and no request was filed.',slide:'Slide 8 · pin 3'},
+ {s:'member',m:'walter',t:'08:15',sel:'[data-tour="meds"]',h:'The med-list diff',p:'Discharge plan vs pharmacy: lisinopril stopped but a 90-day refill shipped home; the new HF drug rejected; furosemide doubled with no new fill.',slide:'Slide 8 · pin 4'},
+ {s:'member',m:'walter',t:'08:15',sel:'[data-tour="facts"]',h:'Labs with their arrival lag',p:'Potassium 5.1 is above range, before two potassium-raising drugs. The weekend HIE batch arrived 4 days late; the screen says so.',slide:'Slide 8 · pin 5'},
+ {s:'member',m:'walter',t:'08:15',sel:'[data-tour="actions"]',h:'An ordered action list',p:'First question, then the prescriber, a drafted packet with a 48-hour reply clock, cardiology, the scale promised on 12 Oct. Options set aside are shown too.',slide:'Slide 8 · pin 6'},
+ {s:'member',m:'walter',t:'08:15',sel:'[data-tour="sticky"]',h:'Synthesis by receiver',p:'Three AI-read facts to confirm, always above the fold. Confirm them and the handoff writes back as clinician-verified.',slide:'Slide 8 · pin 7'},
+ {s:'flag',t:'10:30',sel:'.vs',h:'Right member, wrong problem',p:'The risk model says Gloria is non-adherent. Four signals say she pays cash elsewhere. The flag is downgraded, never deleted, and Maria asks before coaching.',slide:'Slide 10'},
+ {s:'call',t:'15:42',sel:'[data-tour="whowhen"]',h:'15:42: who and when',p:'Her daughter’s mobile, between her sleep and her night shift, texted first under the plan’s name. The landline answered 0 of 4.',slide:'Slide 9 · pin 1'},
+ {s:'call',t:'15:42',sel:'[data-tour="items"]',h:'One call closes five open items',p:'Post-fall check, follow-up, medicine review, caregiver, HRA: their clocks collide this week, so they are bundled.',slide:'Slide 9 · pin 2'},
+ {s:'call',t:'15:42',sel:'[data-tour="assess"]',h:'Confirm, don’t type',p:'31 of 40 fields arrive pre-filled with their source (“0 falls” corrected to 2). The 9 judgment fields stay blank by design. Switch to “All 40” to see every field.',slide:'Slide 9 · pins 3–4'},
+ {s:'call',t:'15:42',sel:'[data-tour="note"]',h:'An AI note draft with brackets only Maria fills',p:'Fill a judgment field and watch its bracket resolve in the note.',slide:'Slide 9 · pin 5'},
+ {s:'call',t:'15:42',sel:'[data-tour="writeback"]',h:'Write-back',p:'Language, best time, falls and the authorisation update plan-wide when Maria saves. The identity link goes to a data steward.',slide:'Slide 9 · pin 6'},
+ {s:'impact',t:'17:00',sel:'[data-tour="kpi"]',h:'What it buys back',p:'Overhead per conversation falls from 100 to 33 minutes; conversations per day double. Drag the inputs: the annex formulas recompute live.',slide:'Slides 2, 11, 12'}
+];
+function startTour(i=0){ closeModal(); S.dwayneDone=false; S.tour={i}; runStep(); }
+function endTour(){ S.tour=null; document.getElementById('tour').innerHTML=''; }
+function runStep(){
+  const st=TOUR[S.tour.i]; closeModal(); S.t=toS(st.t);
+  if(st.act) st.act();
+  if(st.s!==S.screen||(st.m&&st.m!==S.member)) go(st.s,{member:st.m}); else render(true);
+  const el=document.querySelector(st.sel); if(el) el.scrollIntoView({block:'center',behavior:'smooth'});
+  setTimeout(placeSpot,420);
+  document.getElementById('tour').innerHTML=`<div class="spot" id="spot"></div><div class="tourcard" role="dialog" aria-label="Guided tour"><div class="tc-h"><span class="stamp">Mon ${st.t}</span><span class="slide">${st.slide}</span></div>
+   <div class="tc-b"><h3>${st.h}</h3><p>${st.p}</p></div>
+   <div class="tc-f"><div class="dots">${TOUR.map((_,n)=>`<i class="${n<=S.tour.i?'on':''}"></i>`).join('')}</div><div class="row" style="flex-wrap:nowrap"><button class="btn sm ghost" data-act="tourEnd">End</button>${S.tour.i>0?`<button class="btn sm" data-act="tourPrev">Back</button>`:''}<button class="btn sm primary" data-act="tourNext">${S.tour.i===TOUR.length-1?'Finish':'Next'}</button></div></div></div>`;
+}
+function placeSpot(){
+  const sp=document.getElementById('spot'); if(!sp||!S.tour) return;
+  const el=document.querySelector(TOUR[S.tour.i].sel); if(!el){sp.style.opacity=0;return;}
+  const r=el.getBoundingClientRect(); sp.style.opacity=1;
+  Object.assign(sp.style,{left:(r.left-6)+'px',top:(r.top-6)+'px',width:(r.width+12)+'px',height:(r.height+12)+'px'});
+}
+window.addEventListener('resize',()=>S.tour&&placeSpot());
+
+/* =========================================================
+   Welcome
+   ========================================================= */
+function welcome(){
+  const cells=Array.from({length:48},(_,i)=>i<30?'bl':i<38?'bt':'').map(c=>`<i class="${c}"></i>`).join('');
+  modal(`<div class="modal welcome" role="dialog" aria-label="Welcome"><div class="l"><span class="eyebrow">HiLabs APM case 2026–27 · working prototype</span><h1>Maria needs a morning handoff she can trust, not six more screens</h1><p>MCheck® Handoff turns the plan’s own data into an ICU-style handoff, flags what is missing, and lets clinicians confirm instead of type.</p><p style="font-size:13px;color:#A9C2F8">Monday 9 November, 08:00 · Maria R., RN · 48 active cases · six discharges since Friday</p><div class="wblocks" aria-label="30 of 48 ten-minute blocks lost today">${cells}</div><span style="font-size:12px;color:#A9C2F8">30 of her 48 ten-minute blocks go to hunting, re-typing and redialling; 7½ to talking.</span></div>
+   <div class="r"><div class="pillar">${pin(1)}<div><b>Decision-grade picture</b><span>Every fact shows its source, age and conflicts; missing data is flagged, never shown as “no”.</span></div></div>
+    <div class="pillar">${pin(2)}<div><b>Clock-driven queue</b><span>Ranks members by clinical clock × severity × can-act-today, and says why.</span></div></div>
+    <div class="pillar">${pin(3)}<div><b>Confirm, don’t type</b><span>31 of 40 assessment fields arrive pre-filled; each confirmation updates the record plan-wide.</span></div></div>
+    <div class="row" style="margin-top:6px"><button class="btn primary" data-act="tourStart">${ic('play',14)}Walk through Maria’s Monday</button><button class="btn" data-act="closeModal">Explore on my own</button></div>
+    <p class="xs muted" style="margin:0">23 steps, about 4 minutes. The clock runs live; jump to 08:00, 08:15, 11:00 or 15:42 from the top bar. All data is fictional.</p></div></div>`);
+}
+
+/* =========================================================
+   Events
+   ========================================================= */
+document.addEventListener('click',e=>{
+  const t=e.target.closest('[data-go],[data-act],[data-member],[data-jump],[data-why],[data-qf],[data-sev],[data-ai],[data-done],[data-af],[data-read],[data-dt],[data-df],[data-ds],[data-rf],[data-if],[data-recipe],[data-preset],[data-pal],[data-row]');
+  if(!t) return;
+  const d=t.dataset;
+  if(t.classList.contains('scrim') && e.target!==t) return;
+  if(d.act==='closeModal'||d.act==='closeDs'){ if(d.act==='closeDs'||S.dsel){S.dsel=null;render(true);} closeModal(); return; }
+  if(d.pal!=null){ const it=palItems[+d.pal]; closeModal(); it&&it.f(); return; }
+  if(d.go){ go(d.go); return; }
+  if(d.member){ closeModal(); go('member',{member:d.member}); return; }
+  if(d.row){ const q=Q.find(x=>x.name===d.row); if(e.target.closest('[data-why]')) return; go('member',{member:q.key||q.name}); return; }
+  if(d.jump){ S.t=toS(d.jump); const map={'08:00':'queue','08:15':'member','15:42':'call'}; if(d.jump==='08:00'){S.dwayneDone=false;} if(map[d.jump]) go(map[d.jump],{member:'walter'}); else render(true); toast(`Time set to Mon ${d.jump}`); return; }
+  if(d.why){ S.whyOpen[d.why]=!S.whyOpen[d.why]; render(true); return; }
+  if(d.qf){ S.qfilter=d.qf; render(true); return; }
+  if(d.sev){ const m=S.member; const old=S.severity[m]; S.severity[m]=d.sev; if(old!==d.sev) log(`${M[m].name}: illness severity`,old,d.sev,'set by Maria','writeback'); render(true); return; }
+  if(d.ai){ S.aiConfirmed[d.ai]=nowStr(); const [mk,id]=d.ai.split(':'); const a=M[mk].ai.find(x=>x.id===id); log(`${M[mk].name}: ${a.l}`, 'AI-read', 'clinician-verified', 'UM, member services, next CM'); toast(`${a.l} confirmed · written back`); render(true); return; }
+  if(d.done){ S.actionsDone[d.done]=!S.actionsDone[d.done]; render(true); return; }
+  if(d.af){ S.call.filter=d.af; render(true); return; }
+  if(d.read){ S.call.read[d.read]=!S.call.read[d.read]; render(true); return; }
+  if(d.dt){ S.dataTab=d.dt; S.dsel=null; render(); return; }
+  if(d.df){ S.dfilter=d.df; render(true); return; }
+  if(d.ds){ S.dsel=+d.ds; render(true); return; }
+  if(d.rf){ S.rfilter=d.rf; render(true); return; }
+  if(d.if){ S.ifilter=d.if; render(true); return; }
+  if(d.recipe){ S.dataTab='recipes'; S.rfilter='all'; go('data'); setTimeout(()=>{const el=document.getElementById('recipe-'+d.recipe); if(el){el.scrollIntoView({block:'center'}); el.classList.add('flash');}},60); return; }
+  if(d.preset){ S.tm={today:{triage:30,prep:12,failed:18,doc:35},cons:{triage:20,prep:7,failed:15,doc:25},target:{triage:10,prep:4,failed:12,doc:15}}[d.preset]; render(true); return; }
+  switch(d.act){
+    case 'tour': S.tour?endTour():startTour(); break;
+    case 'tourStart': startTour(); break;
+    case 'tourEnd': endTour(); break;
+    case 'tourNext': if(S.tour.i<TOUR.length-1){S.tour.i++;runStep();} else {endTour(); toast('Tour complete. Everything stays clickable.');} break;
+    case 'tourPrev': if(S.tour.i>0){S.tour.i--;runStep();} break;
+    case 'palette': palette(); break;
+    case 'ledger': ledgerDrawer(); break;
+    case 'theme': { const cur=document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'); const nx=cur==='dark'?'light':'dark'; document.documentElement.dataset.theme=nx; try{localStorage.setItem('mc-theme',nx)}catch(err){} break; }
+    case 'callDwayne': dwayneModal(); break;
+    case 'saveDwayne': {
+      if(S.t<toS('08:04')) S.t=toS('08:04');
+      const ck=k=>$ov.querySelector(`[data-dw="${k}"]`).checked;
+      if(ck('num')) log('Dwayne Pruitt: phone','(614) 555-0115','(614) 555-0119','eligibility · member services · next CM');
+      if(ck('sms')) log('Dwayne Pruitt: SMS consent','none','yes (captured via ED CM)','consent record');
+      if(ck('inh')) log('Dwayne Pruitt: controller inhaler','gap 130 days','starter dispensed at ED discharge','case record');
+      if(ck('fqhc')) {log('Dwayne Pruitt: PCP attribution','Dr. J. Whitaker (ghost listing)','Eastfield FQHC (pending)','eligibility · MCheck directory'); log('Dwayne Pruitt: ride to Eastfield FQHC','','booked (D-SNP transport)','task','task');}
+      S.dwayneDone=true; if(S.t<toS('08:04')) S.t=toS('08:04'); closeModal(); render(true); toast('Call saved · written back plan-wide'); break; }
+    case 'openCall': go('call'); break;
+    case 'whyAll': { const any=Object.values(S.whyOpen).some(Boolean); S.whyOpen={}; if(!any) rankedRows().slice(0,S.showAll?99:6).forEach(q=>S.whyOpen[q.name]=true); render(true); break; }
+    case 'showAll': S.showAll=true; render(true); break;
+    case 'showLess': S.showAll=false; S.qfilter='all'; S.qsearch=''; render(true); break;
+    case 'rebalance': S.rebalanced=nowStr(); { const lp=loadPlan(); lp.pulled.forEach(q=>log(`${q.name}: call moved`,q.due,'Mon/Tue spare slot','supervisor approved','route')); log(`${lp.floatW.name}: call routed`,'Maria','float nurse (OH licence, language checked)','supervisor approved','route'); log(`${lp.floatT.name}: call routed`,'Maria','float nurse (OH licence, language checked)','supervisor approved','route'); } closeModal(); render(true); toast('Spike flattened: every day at or under capacity'); break;
+    case 'undoLoad': S.rebalanced=false; render(true); break;
+    case 'loadDetail': loadDetailModal(); break;
+    case 'confirmHandoff': confirmHandoffModal(M[S.member]); break;
+    case 'confirmAll': { const m=M[d.m]; m.ai.forEach(a=>{const k=m.key+':'+a.id; if(!S.aiConfirmed[k]){S.aiConfirmed[k]=nowStr(); log(`${m.name}: ${a.l}`,'AI-read','clinician-verified','UM, member services, next CM');}}); S.handoffConfirmed[m.key]=nowStr(); closeModal(); render(true); toast(`${m.name.split(' ')[0]}’s handoff confirmed · ${m.ai.length} facts written back`); break; }
+    case 'keepFlag': keepFlagModal(); break;
+    case 'keepFlagSave': { const r=$ov.querySelector('input[name=kr]:checked').value; S.flag='kept'; log('Gloria Mensah: “non-adherent” flag kept','downgraded','restored · reason: '+r,'reviewed monthly by clinical lead','override'); closeModal(); render(true); toast('Flag kept · override reason logged'); break; }
+    case 'acceptFlag': S.flag='accepted'; S.tasks=['Text Gloria; call 16:00–16:30: confirm where she fills metformin','Dr. Nair: appeal the empagliflozin denial with the evidence (by 26 Dec)','Book a diabetes visit (A1c 9.2%)']; S.tasks.forEach(t=>log('Gloria Mensah: task',null,t,'this week','task')); render(true); toast('Accepted · 3 tasks added to this week'); break;
+    case 'flagReset': S.flag=null; S.tasks=[]; render(true); break;
+    case 'readAll': ANNEX.assess.filter(f=>f[6]!=='Y').forEach(f=>S.call.read[f[0]]=true); render(true); break;
+    case 'sample': Object.assign(S.call.j,A_SAMPLE); render(true); break;
+    case 'draftCall': toast('Draft saved · nothing written back yet'); break;
+    case 'saveCall': {
+      const jf=ANNEX.assess.filter(f=>f[6]==='Y'); const left=jf.filter(f=>!(S.call.j[f[0]]||'').trim());
+      if(left.length){ toast(`${left.length} judgment field${left.length>1?'s':''} still need you`); S.call.filter='need'; render(true); break; }
+      S.call.saved=true; S.call.endT=S.t;
+      [['Rosa Delgado: preferred language','blank','Spanish, interpreter needed','eligibility'],['Rosa Delgado: best contact','landline (614) 555-0186','Marisol (614) 555-0187, 15:30–17:00','contact points'],['Rosa Delgado: falls in past year','0 (HRA Nov 2025)','2','HRA · case record'],['Rosa Delgado: authorisation renewal','expires 30 Nov','form sent by SMS','consent']].forEach(a=>log(...a));
+      log('Rosa Delgado: identity link “Delgado-Ruiz”','suggested 0.94','sent to data steward','MCheck identity','task');
+      render(true); toast('Saved · 4 facts written back, 1 sent to the data steward'); break; }
+  }
+});
+document.addEventListener('change',e=>{
+  const t=e.target;
+  if(t.dataset.item!=null){ S.call.items[t.dataset.item]=t.checked; return; }
+  if(t.dataset.j){ S.call.j[t.dataset.j]=t.value; render(true); return; }
+});
+document.addEventListener('input',e=>{
+  const t=e.target;
+  if(t.id==='qsearch'){ S.qsearch=t.value; const pos=t.selectionStart; render(true); const n=document.getElementById('qsearch'); n.focus(); n.setSelectionRange(pos,pos); return; }
+  if(t.dataset.tm){ S.tm[t.dataset.tm]=+t.value; const id=t.id; render(true); const n=document.getElementById(id); n&&n.focus(); return; }
+});
+document.addEventListener('focusout',e=>{ const t=e.target; if(t.dataset&&t.dataset.j&&t.tagName==='INPUT'){ if(S.call.j[t.dataset.j]!==t.value){S.call.j[t.dataset.j]=t.value; render(true);} } });
+let qSel=-1;
+document.addEventListener('keydown',e=>{
+  const typing=/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName);
+  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){ e.preventDefault(); palette(); return; }
+  if(e.key==='Escape'){ if(S.dsel){S.dsel=null;render(true);} if($ov.innerHTML){ closeModal(); } else if(S.tour) endTour(); return; }
+  const pal=document.getElementById('palList');
+  if(pal){ if(e.key==='ArrowDown'||e.key==='ArrowUp'){ e.preventDefault(); palSel=Math.max(0,Math.min(palItems.length-1,palSel+(e.key==='ArrowDown'?1:-1))); pal.querySelectorAll('li').forEach((l,i)=>l.setAttribute('aria-selected',String(i===palSel))); pal.children[palSel]&&pal.children[palSel].scrollIntoView({block:'nearest'}); } else if(e.key==='Enter'){ const it=palItems[palSel]; closeModal(); it&&it.f(); } return; }
+  if(typing||$ov.innerHTML) { if(e.key==='Enter'&&document.activeElement.dataset&&document.activeElement.dataset.row){document.activeElement.click();} return; }
+  if(S.tour&&(e.key==='ArrowRight'||e.key==='ArrowLeft')){ e.preventDefault(); document.querySelector(`[data-act="${e.key==='ArrowRight'?'tourNext':'tourPrev'}"]`)?.click(); return; }
+  const k=e.key.toLowerCase();
+  const scr={1:'queue',2:'member',3:'call',4:'flag',5:'data',6:'impact'}[e.key]; if(scr){ go(scr); return; }
+  if(k==='t'){ S.tour?endTour():startTour(); return; }
+  if(k==='d'){ document.querySelector('[data-act="theme"]').click(); return; }
+  if(e.key==='?'){ helpModal(); return; }
+  if(S.screen==='queue'&&(k==='j'||k==='k')){ const rows=[...document.querySelectorAll('tr.qrow')]; if(!rows.length) return; qSel=Math.max(0,Math.min(rows.length-1,qSel+(k==='j'?1:-1))); rows.forEach(r=>r.classList.remove('sel')); rows[qSel].classList.add('sel'); rows[qSel].focus(); return; }
+  if(e.key==='Enter'&&document.activeElement.dataset&&document.activeElement.dataset.row){ document.activeElement.click(); }
+});
+
+/* =========================================================
+   Clock
+   ========================================================= */
+const DAYS='Monday 9 November';
+function tick(force){
+  const sc=document.getElementById('simclock');
+  sc.innerHTML=`<span class="dlong">${DAYS}, </span><span class="dshort">Mon </span>${nowStr()}<span class="sec">:${String(S.t%60).padStart(2,'0')}</span>`;
+  document.querySelectorAll('.jump button').forEach(b=>b.setAttribute('aria-pressed',String(nowStr()===b.dataset.jump)));
+  const ed=document.querySelector('[data-live="edtimer"]'); if(ed) ed.textContent=edTimer();
+  const ct=document.querySelector('[data-live="calltimer"]'); if(ct) ct.textContent=fmtDur(callDur());
+  const dt=document.querySelector('[data-live="doctimer"]'); if(dt) dt.textContent=docMin();
+}
+let lastGone=false, lastDme=false;
+setInterval(()=>{
+  if(!S.running) return; S.t+=1; tick();
+  const g=dwayneGone(), dm=dmeDecided();
+  if((g!==lastGone||dm!==lastDme)&&!$ov.innerHTML&&!/INPUT|SELECT/.test(document.activeElement.tagName)){ lastGone=g; lastDme=dm; render(true); }
+},1000);
+
+/* boot */
+render();
+lastGone=dwayneGone(); lastDme=dmeDecided();
+let seen=false; try{seen=localStorage.getItem('mc-welcome')==='1'; localStorage.setItem('mc-welcome','1');}catch(e){}
+const params=new URLSearchParams(location.search);
+if(params.get('tour')==='1') startTour(); else if(!seen||params.get('welcome')==='1') welcome();
+</script>
+</body>
+</html>

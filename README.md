@@ -6,6 +6,8 @@ All members, numbers, providers and the health plan are fictional. The data is t
 
 ## What's inside
 
+**v2 (simplified for Maria):** Today · Member · Call for the nurse; Data & trust · Impact under "For reviewers"; a "Show the why" toggle reveals reviewer notes; demo controls sit in the header's Demo menu.
+
 | Screen | Deck slide | What you can do |
 |---|---|---|
 | Queue | 7 | Live ED timer for Dwayne in the NOW lane; scheduled lane for Rosa; ranked queue of the 48-member caseload with "Why" score breakdowns (U × I/5 × A); filter and search; clock-load spike with supervisor rebalance |
